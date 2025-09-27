@@ -7,7 +7,6 @@
 - [FILE_ROLES.md](./FILE_ROLES.md) - Mapa de responsabilidades por arquivo
 - [API_REFERENCE.md](./API_REFERENCE.md) - Referência completa da API
 - [ARCHITECTURE.md](./ARCHITECTURE.md) - Diagramas e fluxo do sistema
-- [TODOs_AND_REFACTORING.md](./TODOs_AND_REFACTORING.md) - Melhorias recomendadas
 
 ## Estrutura do Projeto
 
