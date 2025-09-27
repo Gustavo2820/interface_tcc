@@ -56,27 +56,5 @@ python unified/z_experiment1_audition.py
 - Pillow==8.1.0
 - pymoo (para arquivos z*)
 
-## Riscos Identificados
 
-###  Críticos
-- Cache sem controle de invalidação
-- Explosão combinatória em força bruta
-- Falta de thread safety
 
-###  Importantes
-- Funções muito longas
-- Falta de type hints
-- Duplicação de código
-
-###  Melhorias
-- Falta de testes unitários
-- Documentação incompleta
-- Otimizações de performance
-
-## Próximos Passos
-
-1. Implementar controle de cache
-2. Adicionar type hints
-3. Implementar testes unitários
-4. Refatorar funções longas
-5. Adicionar documentação de código
