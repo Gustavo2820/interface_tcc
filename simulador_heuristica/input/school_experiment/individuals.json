@@ -1,0 +1,41 @@
+{
+    "description": "Individuals of the school experiment",
+    "caracterizations":[
+        {
+            "label": "Students",
+            "amount": 300,
+            "red": 144,
+            "green": 238,
+            "blue": 144,
+            "speed": 1,
+            "KD": 1.2,
+            "KS": 1.7,
+            "KW": 0.3,
+            "KI": 1.5
+        },
+        {
+            "label": "Teachers",
+            "amount": 13,
+            "red": 173,
+            "green": 216,
+            "blue": 230,
+            "speed": 1,
+            "KD": 1,
+            "KS": 2.1,
+            "KW": 0.3,
+            "KI": 1
+        },
+        {
+            "label": "Functionary",
+            "amount": 14,
+            "red": 0,
+            "green": 100,
+            "blue": 0,
+            "speed": 1,
+            "KD": 1,
+            "KS": 2.2,
+            "KW": 0.3,
+            "KI": 1
+        }
+    ]
+}

@@ -1,0 +1,53 @@
+{
+    "description": "Individuals of the balada experiment",
+    "caracterizations":[
+        {
+            "label": "Young people",
+            "amount": 1008,
+            "red": 135,
+            "green": 206,
+            "blue": 235,
+            "speed": 1,
+            "KD": 1.2,
+            "KS": 2.2,
+            "KW": 0.3,
+            "KI": 1.2
+        },
+        {
+            "label": "Adults",
+            "amount": 908,
+            "red": 0,
+            "green": 100,
+            "blue": 0,
+            "speed": 1,
+            "KD": 1,
+            "KS": 2,
+            "KW": 0.3,
+            "KI": 1
+        },
+        {
+            "label": "Old people",
+            "amount": 81,
+            "red": 173,
+            "green": 255,
+            "blue": 47,
+            "speed": 2,
+            "KD": 1,
+            "KS": 1.8,
+            "KW": 0.3,
+            "KI": 1.2
+        },
+        {
+            "label": "Organizacao",
+            "amount": 21,
+            "red": 218,
+            "green": 165,
+            "blue": 32,
+            "speed": 1,
+            "KD": 1,
+            "KS": 2.5,
+            "KW": 0.3,
+            "KI": 1
+        }
+    ]
+} 

@@ -1,0 +1,89 @@
+{
+    "description": "Individuals of the cult experiment",
+    "caracterizations":[
+        {
+            "label": "Kids",
+            "amount": 13,
+            "red": 106,
+            "green": 90,
+            "blue": 205,
+            "speed": 1,
+            "KD": 1.5,
+            "KS": 1.5,
+            "KW": 0.3,
+            "KI": 1.5
+        },
+        {
+            "label": "Young people",
+            "amount": 20,
+            "red": 135,
+            "green": 206,
+            "blue": 235,
+            "speed": 1,
+            "KD": 1.2,
+            "KS": 1.6,
+            "KW": 0.3,
+            "KI": 1.5
+        },
+        {
+            "label": "Adults",
+            "amount": 26,
+            "red": 0,
+            "green": 100,
+            "blue": 0,
+            "speed": 1,
+            "KD": 1,
+            "KS": 1.8,
+            "KW": 0.3,
+            "KI": 1
+        },
+        {
+            "label": "Old people",
+            "amount": 73,
+            "red": 173,
+            "green": 255,
+            "blue": 47,
+            "speed": 2,
+            "KD": 1,
+            "KS": 1.8,
+            "KW": 0.3,
+            "KI": 1
+        },
+        {
+            "label": "Shepherd",
+            "amount": 1,
+            "red": 173,
+            "green": 216,
+            "blue": 230,
+            "speed": 2,
+            "KD": 1,
+            "KS": 1.8,
+            "KW": 0.3,
+            "KI": 1
+        },
+        {
+            "label": "Assistents",
+            "amount": 4,
+            "red": 218,
+            "green": 165,
+            "blue": 32,
+            "speed": 1,
+            "KD": 1,
+            "KS": 1.8,
+            "KW": 0.3,
+            "KI": 1
+        },
+        {
+            "label": "Choir",
+            "amount": 8,
+            "red": 75,
+            "green": 0,
+            "blue": 130,
+            "speed": 1,
+            "KD": 1,
+            "KS": 1.8,
+            "KW": 0.3,
+            "KI": 1
+        }
+    ]
+} 

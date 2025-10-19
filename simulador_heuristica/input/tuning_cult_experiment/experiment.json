@@ -1,0 +1,8 @@
+{
+    "experiment": "tuning_cult_experiment",
+    "draw": false,
+    "scenario_seed": [
+        1
+    ],
+    "simulation_seed": 14
+}

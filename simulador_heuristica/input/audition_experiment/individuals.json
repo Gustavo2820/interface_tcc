@@ -1,0 +1,29 @@
+{
+    "description": "Individuals of the audition experiment",
+    "caracterizations":[
+        {
+            "label": "Alunos",
+            "amount": 211,
+            "red": 135,
+            "green": 206,
+            "blue": 235,
+            "speed": 1,
+            "KD": 1.4,
+            "KS": 1.8,
+            "KW": 0.3,
+            "KI": 1
+        },
+        {
+            "label": "Servidores",
+            "amount": 9,
+            "red": 230,
+            "green": 120,
+            "blue": 50,
+            "speed": 1,
+            "KD": 1,
+            "KS": 2.2,
+            "KW": 0.3,
+            "KI": 1
+        }
+    ]
+} 
