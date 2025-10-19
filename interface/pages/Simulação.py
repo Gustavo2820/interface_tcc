@@ -1,135 +1,82 @@
 # pages/simulacao.py
 """
 Interface para configuração de simulações de evacuação.
-
-Este módulo permite aos usuários configurar parâmetros específicos de simulação,
-visualizar o mapa selecionado e iniciar a execução de simulações.
+Permite criar ou carregar parâmetros de simulação, criar/editar indivíduos,
+selecionar mapas e executar a simulação.
 """
 import streamlit as st
 from pathlib import Path
 from PIL import Image
 import json
 import sys
-import os
+import numpy as np
+import shutil
+from datetime import datetime
 
-# Adiciona o caminho dos serviços ao sys.path
-sys.path.append(str(Path(__file__).parent.parent))
+# ================= SESSION STATE =================
+for key in ['run_sim', 'view_results', 'last_results', 'last_experiment', 'individuals_textarea']:
+    if key not in st.session_state:
+        st.session_state[key] = False if 'run' in key or 'view' in key else None
+st.session_state.individuals_textarea = st.session_state.individuals_textarea or "[]"
+
+# Adiciona diretórios necessários ao sys.path
+services_dir = str(Path(__file__).parent.parent)
+if services_dir not in sys.path:
+    sys.path.append(services_dir)
+
+# Adiciona o diretório raiz do projeto para permitir importar 'simulador_heuristica'
+project_root = str(Path(__file__).resolve().parents[2])
+if project_root not in sys.path:
+    sys.path.append(project_root)
 
 from services.simulator_integration import SimulatorIntegration, DatabaseIntegration
 from services.map_creation_integration import map_creation_service
+from services.nsga_integration import NSGAIntegration
 
 # ================= CONFIGURAÇÃO DA PÁGINA =================
 st.set_page_config(page_title="Simulação", layout="wide")
 
-# ================= CSS GLOBAL =================
-st.markdown("""
-    <style>
-    body {
-        font-family: 'Inter', 'Roboto', sans-serif;
-        background-color: white;
-        color: #222;
-    }
+# ================= INICIALIZAÇÃO DOS SERVIÇOS =================
+if 'simulator_integration' not in st.session_state:
+    st.session_state.simulator_integration = SimulatorIntegration()
+if 'db_integration' not in st.session_state:
+    st.session_state.db_integration = DatabaseIntegration()
+if 'nsga_integration' not in st.session_state:
+    st.session_state.nsga_integration = NSGAIntegration(st.session_state.simulator_integration)
 
-    /* ===== MENU SUPERIOR ===== */
-    .menu {
-        display: flex;
-        justify-content: center;
-        gap: 40px;
-        margin-bottom: 40px;
-        font-size: 20px;
-        font-weight: 600;
-    }
-    .menu a {
-        text-decoration: none;
-        color: #bbb;
-        transition: color 0.2s;
-    }
-    .menu a:hover {
-        color: #fff;
-    }
-    .menu a.active {
-        color: #fff;
-        font-weight: 700;
-        border-bottom: 2px solid #1e90ff;
-        padding-bottom: 4px;
-    }
+# ================= CARREGAMENTO DE MAPAS =================
+mapas_dir = Path("mapas")
+mapas_dir.mkdir(exist_ok=True)
+map_options = sorted([p.stem for p in mapas_dir.glob("*.png")])
 
-    /* ===== BOTÕES ===== */
-    .botoes {
-        display: flex;
-        justify-content: flex-end;
-        gap: 20px;
-        margin-right: 40px;
-        margin-bottom: 30px;
-    }
-    .botao {
-        background-color: #142b3b;
-        color: white;
-        border: none;
-        border-radius: 8px;
-        padding: 10px 24px;
-        font-size: 16px;
-        font-weight: 600;
-        cursor: pointer;
-        text-decoration: none;
-        transition: all 0.2s ease-in-out;
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-    }
-    .botao:hover {
-        transform: scale(1.05);
-        background-color: #1d3d57;
-    }
+# ================= FUNÇÕES =================
+def start_simulation():
+    st.session_state.run_sim = True
 
-    /* ===== LAYOUT CENTRAL ===== */
-    .container {
-        display: flex;
-        flex-direction: row;
-        justify-content: center;
-        align-items: flex-start;
-        gap: 60px;
-        width: 100%;
+def quantize_map_colors(image_path):
+    valid_colors = {
+        "wall": np.array([0,0,0]),
+        "door": np.array([255,0,0]),
+        "empty": np.array([255,255,255]),
+        "drawing": np.array([255,165,0]),
+        "window": np.array([0,255,0])
     }
-    .painel-esquerda {
-        display: flex;
-        flex-direction: column;
-        gap: 25px;
-    }
-    .bloco {
-        background-color: #142b3b;
-        color: white;
-        text-align: center;
-        border-radius: 10px;
-        padding: 10px 0;
-        font-weight: bold;
-    }
-    .input {
-        background-color: #b3b3b3;
-        border: none;
-        border-radius: 6px;
-        padding: 6px;
-        color: black;
-        width: 200px;
-        text-align: center;
-    }
-    .mapa {
-        border: 1px solid #ccc;
-        border-radius: 6px;
-        width: 800px;
-        height: 600px;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-    }
-    </style>
-""", unsafe_allow_html=True)
+    img = Image.open(image_path).convert("RGB")
+    arr = np.array(img)
+    def closest_color(pixel):
+        distances = {name: np.sum((pixel - col)**2) for name, col in valid_colors.items()}
+        return valid_colors[min(distances, key=distances.get)]
+    new_arr = np.zeros_like(arr)
+    for i in range(arr.shape[0]):
+        for j in range(arr.shape[1]):
+            new_arr[i,j] = closest_color(arr[i,j])
+    Image.fromarray(new_arr).save(image_path)
 
 # ================= MENU SUPERIOR =================
 st.markdown("""
-<div class="menu">
-    <a href="../app" >Menu</a>
-    <a href="./Mapas" class="active">Mapas</a>
+<div style="display:flex; gap:30px; margin-bottom:20px;">
+    <a href="../app">Menu</a>
+    <a href="./Mapas" style="font-weight:bold;">Mapas</a>
     <a href="./Criacao_Mapas">Criação de Mapas</a>
     <a href="./Parâmetros">Parâmetros</a>
     <a href="./Resultados">Resultados</a>
@@ -137,185 +84,390 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# ================= INICIALIZAÇÃO DOS SERVIÇOS =================
-if 'simulator_integration' not in st.session_state:
-    st.session_state.simulator_integration = SimulatorIntegration()
-if 'db_integration' not in st.session_state:
-    st.session_state.db_integration = DatabaseIntegration()
-
-# ================= OBTÉM PARÂMETROS DA URL E LISTA MAPAS =================
-params = st.query_params
-mapa_nome = params.get("mapa", [""])[0] if isinstance(params.get("mapa"), list) else params.get("mapa", "")
-
-# Carrega mapas disponíveis do diretório 'mapas/'
-mapas_dir = Path("mapas")
-mapas_dir.mkdir(exist_ok=True)
-map_options = sorted([p.stem for p in mapas_dir.glob("*.png")])
-
-# ================= BOTÕES SUPERIORES =================
-col_btn1, col_btn2, col_btn3 = st.columns([1, 1, 1])
-
+# ================= BOTÕES =================
+col_btn1, col_btn2, col_btn3 = st.columns([1,1,1])
 with col_btn1:
-    if st.button("💾 Salvar Configuração", key="save_config"):
+    if st.button("💾 Salvar Configuração"):
         st.success("Configuração salva!")
-
 with col_btn2:
-    if st.button("▶️ Executar Simulação", key="run_simulation"):
-        st.session_state.run_simulation = True
-
+    st.button("▶️ Executar Simulação", on_click=start_simulation)
 with col_btn3:
-    if st.button("📊 Ver Resultados", key="view_results"):
+    if st.button("📊 Ver Resultados"):
         st.session_state.view_results = True
 
-# ================= CONTEÚDO PRINCIPAL =================
-col1, col2 = st.columns([1, 3])
-
+# ================= FORMULÁRIO PRINCIPAL =================
+col1, col2 = st.columns([1,3])
 with col1:
-    st.markdown('<div class="bloco">Nome da Simulação</div>', unsafe_allow_html=True)
-    simulation_name = st.text_input("", value=f"sim_{mapa_nome}", key="sim_name")
+    simulation_name = st.text_input("Nome da Simulação", value="sim_default")
+    algorithm = st.selectbox("Algoritmo", ["Simulação Direta","Algoritmo Genético","NSGA-II","Força Bruta"])
+    selected_map = st.selectbox("Mapa", options=["(selecione)"] + map_options)
+    mapa_nome = selected_map if selected_map != "(selecione)" else None
 
-    st.markdown('<div class="bloco">Algoritmo</div>', unsafe_allow_html=True)
-    algorithm = st.selectbox("", ["Simulação Direta", "Algoritmo Genético", "NSGA-II", "Força Bruta"], key="algorithm")
+    # Upload de parâmetros
+    uploaded_params_file = st.file_uploader("Carregar parâmetros (.json)", type=["json"])
+    nsga_config_uploaded_path = None
+    if algorithm == "NSGA-II":
+        nsga_cfg = st.file_uploader("Config NSGA-II (.json)", type=["json"], key="nsga_cfg")
+        if nsga_cfg:
+            try:
+                nsga_dir = Path("uploads")/"nsga_ii"
+                nsga_dir.mkdir(parents=True, exist_ok=True)
+                from datetime import datetime as _dt
+                nsga_cfg_path = nsga_dir / f"config_{_dt.now().strftime('%Y%m%d_%H%M%S')}.json"
+                nsga_cfg_path.write_text(nsga_cfg.read().decode('utf-8'))
+                nsga_config_uploaded_path = nsga_cfg_path
+                # carrega configuração no integrador
+                st.session_state.nsga_integration.load_configuration(nsga_cfg_path)
+                st.success("Configuração NSGA-II carregada.")
+            except Exception as e:
+                st.warning(f"Falha ao salvar/carregar config NSGA-II: {e}")
+    if uploaded_params_file:
+        try:
+            loaded_params = json.load(uploaded_params_file)
+            for k,v in loaded_params.items():
+                st.session_state[k] = v
+            st.success("Parâmetros carregados!")
+        except Exception as e:
+            st.error(f"Erro ao carregar parâmetros: {e}")
 
-    st.markdown('<div class="bloco">Mapa</div>', unsafe_allow_html=True)
-    selected_map = st.selectbox("", options=["(selecione)"] + map_options, index=(map_options.index(mapa_nome)+1) if mapa_nome in map_options else 0, key="selected_map")
-    if selected_map != "(selecione)" and selected_map != mapa_nome:
-        mapa_nome = selected_map
-        st.session_state["selected_map_name"] = mapa_nome
+    # Parâmetros da simulação
+    with st.expander("Criar/Editar parâmetros"):
+        pop_size = st.number_input("pop_size", value=st.session_state.get("pop_size",10), min_value=1)
+        mut_prob = st.number_input("mut_prob", value=st.session_state.get("mut_prob",0.4), min_value=0.0, max_value=1.0, step=0.01)
+        max_gen = st.number_input("max_gen", value=st.session_state.get("max_gen",300), min_value=1)
+        scenario_seed = st.number_input("Seed do cenário", value=st.session_state.get("scenario_seed",75), min_value=0)
+        simulation_seed = st.number_input("Seed da simulação", value=st.session_state.get("simulation_seed",75), min_value=0)
 
-    st.markdown('<div class="bloco">Arquivo de Parâmetros</div>', unsafe_allow_html=True)
-    param_file = st.file_uploader("", type=["json", "txt"], key="param_file")
+        if st.button("💾 Salvar parâmetros"):
+            params_dict = dict(pop_size=pop_size, mut_prob=mut_prob, max_gen=max_gen, scenario_seed=scenario_seed, simulation_seed=simulation_seed)
+            Path("temp_simulation").mkdir(exist_ok=True)
+            with open("temp_simulation/parameters.json","w") as f:
+                json.dump(params_dict,f,indent=2)
+            st.success("Parâmetros salvos!")
 
-    st.markdown('<div class="bloco">Arquivo de Indivíduos</div>', unsafe_allow_html=True)
-    individuals_file = st.file_uploader("", type=["json"], key="individuals_file")
+    # Formulário de criação de configuração NSGA-II
+    if algorithm == "NSGA-II":
+        with st.expander("Criar Configuração NSGA-II"):
+            with st.form("form_nsga_cfg"):
+                population_size = st.number_input("population_size", min_value=2, value=20)
+                generations = st.number_input("generations", min_value=1, value=50)
+                crossover_rate = st.number_input("crossover_rate", min_value=0.0, max_value=1.0, value=0.9, step=0.05)
+                mutation_rate = st.number_input("mutation_rate", min_value=0.0, max_value=1.0, value=0.1, step=0.05)
+                submit_cfg = st.form_submit_button("💾 Salvar configuração NSGA-II")
+            if submit_cfg:
+                nsga_dir = Path("uploads")/"nsga_ii"
+                nsga_dir.mkdir(parents=True, exist_ok=True)
+                cfg = {
+                    "population_size": int(population_size),
+                    "generations": int(generations),
+                    "crossover_rate": float(crossover_rate),
+                    "mutation_rate": float(mutation_rate)
+                }
+                cfg_path = nsga_dir/"generated_config.json"
+                cfg_path.write_text(json.dumps(cfg, indent=2))
+                st.session_state.nsga_integration.load_configuration(cfg_path)
+                st.success(f"Configuração NSGA-II salva em {cfg_path}")
 
-    # Configurações avançadas
-    with st.expander("⚙️ Configurações Avançadas"):
-        draw_mode = st.checkbox("Gerar imagens", value=True)
-        scenario_seed = st.number_input("Seed do cenário", value=None, min_value=0)
-        simulation_seed = st.number_input("Seed da simulação", value=None, min_value=0)
+    # Upload ou criação de indivíduos (editor interativo)
+    uploaded_individuals_file = st.file_uploader("Arquivo de indivíduos (.json)", type=["json"])
+    if uploaded_individuals_file:
+        try:
+            st.session_state.individuals_textarea = json.dumps(json.load(uploaded_individuals_file), indent=2)
+            st.success("Indivíduos carregados!")
+        except Exception as e:
+            st.error(f"Erro ao carregar indivíduos: {e}")
+
+    st.markdown("---")
+    st.markdown("#### Editor de Indivíduos")
+    try:
+        current_list = json.loads(st.session_state.get("individuals_textarea","[]"))
+        if isinstance(current_list, dict) and "caracterizations" in current_list:
+            # Converte caracterizations (formato de grupos) para lista simples para edição
+            tmp = []
+            for c in current_list.get("caracterizations", []):
+                amount = int(c.get("amount", 1))
+                for _ in range(amount):
+                    tmp.append({
+                        "label": c.get("label","Individuo"),
+                        "color": [c.get("red",255), c.get("green",0), c.get("blue",0)],
+                        "speed": c.get("speed",1),
+                        "KD": c.get("KD",1.0),
+                        "KS": c.get("KS",1.0),
+                        "KW": c.get("KW",1.0),
+                        "KI": c.get("KI",0.5),
+                        "row": 0,
+                        "col": 0
+                    })
+            current_list = tmp
+        if not isinstance(current_list, list):
+            current_list = []
+    except Exception:
+        current_list = []
+
+    num_inds = st.number_input("Quantidade de indivíduos", min_value=0, value=len(current_list))
+    # Ajusta tamanho da lista
+    if num_inds > len(current_list):
+        for _ in range(num_inds - len(current_list)):
+            current_list.append({"label":"Individuo","color":[255,0,0],"speed":1,"KD":1.0,"KS":1.0,"KW":1.0,"KI":0.5,"row":0,"col":0})
+    elif num_inds < len(current_list):
+        current_list = current_list[:num_inds]
+
+    for i in range(len(current_list)):
+        with st.expander(f"Indivíduo {i+1}", expanded=False):
+            ind = current_list[i]
+            ind["label"] = st.text_input(f"Label {i+1}", value=ind.get("label","Individuo"), key=f"lbl_{i}")
+            c1, c2, c3 = st.columns(3)
+            with c1:
+                r = st.number_input(f"R {i+1}", min_value=0, max_value=255, value=int(ind.get("color",[255,0,0])[0]), key=f"r_{i}")
+            with c2:
+                g = st.number_input(f"G {i+1}", min_value=0, max_value=255, value=int(ind.get("color",[255,0,0])[1]), key=f"g_{i}")
+            with c3:
+                b = st.number_input(f"B {i+1}", min_value=0, max_value=255, value=int(ind.get("color",[255,0,0])[2]), key=f"b_{i}")
+            ind["color"] = [r,g,b]
+            c4, c5 = st.columns(2)
+            with c4:
+                # Garante que o valor padrão respeite o min_value (evita erro quando JSON traz 0 ou negativo)
+                _spd_default = ind.get("speed", 1)
+                try:
+                    _spd_default = int(_spd_default)
+                except Exception:
+                    _spd_default = 1
+                if _spd_default < 1:
+                    _spd_default = 1
+                ind["speed"] = st.number_input(
+                    f"Velocidade {i+1}",
+                    min_value=1,
+                    value=_spd_default,
+                    key=f"spd_{i}"
+                )
+            with c5:
+                ind["KD"] = st.number_input(f"KD {i+1}", min_value=0.0, value=float(ind.get("KD",1.0)), step=0.1, key=f"kd_{i}")
+            c6, c7 = st.columns(2)
+            with c6:
+                ind["KS"] = st.number_input(f"KS {i+1}", min_value=0.0, value=float(ind.get("KS",1.0)), step=0.1, key=f"ks_{i}")
+            with c7:
+                ind["KW"] = st.number_input(f"KW {i+1}", min_value=0.0, value=float(ind.get("KW",1.0)), step=0.1, key=f"kw_{i}")
+            ind["KI"] = st.number_input(f"KI {i+1}", min_value=0.0, value=float(ind.get("KI",0.5)), step=0.1, key=f"ki_{i}")
+            c8, c9 = st.columns(2)
+            with c8:
+                ind["row"] = st.number_input(f"Row {i+1}", min_value=0, value=int(ind.get("row",0)), key=f"row_{i}")
+            with c9:
+                ind["col"] = st.number_input(f"Col {i+1}", min_value=0, value=int(ind.get("col",0)), key=f"col_{i}")
+
+    # Sincroniza JSON de indivíduos e permite salvar
+    st.session_state.individuals_textarea = json.dumps(current_list, indent=2)
+    st.text_area("JSON de indivíduos", value=st.session_state.individuals_textarea, height=160, key="inds_json_view")
+
+    if st.button("💾 Salvar indivíduos"):
+        Path("temp_simulation").mkdir(exist_ok=True)
+        Path("temp_simulation/individuals.json").write_text(st.session_state.individuals_textarea)
+        st.success("Indivíduos salvos!")
 
 with col2:
-    # Carregar imagem do mapa selecionado
     if mapa_nome:
         mapa_path = Path("mapas") / f"{mapa_nome}.png"
         if mapa_path.exists():
-            img = Image.open(mapa_path)
-            st.image(img, use_container_width=True)
+            quantize_map_colors(mapa_path)
+            img = Image.open(mapa_path).resize((800,600),Image.NEAREST)
+            st.image(img,use_column_width=False)
         else:
             st.warning("Mapa não encontrado.")
     else:
         st.info("Selecione um mapa para visualizar.")
 
-# ================= EXECUÇÃO DA SIMULAÇÃO =================
-if st.session_state.get('run_simulation', False):
+# ================= EXECUÇÃO =================
+if st.session_state.run_sim:
     if not mapa_nome:
         st.error("Selecione um mapa primeiro.")
-    elif not individuals_file:
-        st.error("Faça upload do arquivo de indivíduos.")
+    elif not st.session_state.get("individuals_textarea"):
+        st.error("Defina ou carregue indivíduos antes de executar a simulação.")
     else:
         with st.spinner("Executando simulação..."):
             try:
-                # Salva arquivos temporários
                 temp_dir = Path("temp_simulation")
                 temp_dir.mkdir(exist_ok=True)
-                
-                # Salva arquivo de indivíduos
+
                 individuals_path = temp_dir / "individuals.json"
-                with open(individuals_path, 'w') as f:
-                    json.dump(json.load(individuals_file), f, indent=2)
-                
-                # Converte o PNG escolhido para map.txt para o simulador
-                # Estratégia: garantir estabilidade com o simulador (usa map.txt)
-                png_chosen = Path("mapas") / f"{mapa_nome}.png"
-                if not png_chosen.exists():
-                    st.error("PNG do mapa selecionado não encontrado.")
-                    raise RuntimeError("Mapa PNG ausente")
-                
-                # Converter PNG → .map principal (códigos) usando utilitário existente
-                # Em seguida, traduzir .map para map.txt no formato do simulador (0/1/2... como já usa)
-                # Para manter simplicidade e compatibilidade, usaremos o .map gerado como map.txt
-                base_tmp = temp_dir / "selected_map"
-                from services.map_creation_integration import map_creation_service
-                gen = map_creation_service.convert_image_to_maps(str(png_chosen), str(base_tmp))
-                main_map_path = Path(gen.get("main", ""))
+                with open(individuals_path,"w") as f:
+                    json.dump(json.loads(st.session_state.individuals_textarea),f,indent=2)
+
+                gen = map_creation_service.convert_image_to_maps(str(mapa_path), str(temp_dir / "selected_map"))
+                main_map_path = Path(gen.get("main",""))
                 if not main_map_path.exists():
-                    st.error("Falha ao gerar arquivo .map a partir do PNG selecionado.")
-                    raise RuntimeError("Conversão .map falhou")
-                
-                # Copiar/renomear para map.txt esperado pelo simulador
-                map_path = temp_dir / "map.txt"
-                with open(main_map_path, 'r') as fsrc, open(map_path, 'w') as fdst:
-                    fdst.write(fsrc.read())
+                    raise RuntimeError("Falha ao gerar .map")
+
+                simulator_input_dir = Path("simulador_heuristica") / "input" / simulation_name
+                simulator_input_dir.mkdir(parents=True, exist_ok=True)
+
+                shutil.copy2(main_map_path, simulator_input_dir / "map.txt")
+                shutil.copy2(individuals_path, simulator_input_dir / "individuals.json")
+
+                # Se NSGA-II, executa otimização multiobjetivo
+                if algorithm == "NSGA-II":
+                    st.info("Iniciando execução NSGA-II...")
+                    # exige configuração NSGA-II carregada
+                    if not getattr(st.session_state.nsga_integration, 'config', None):
+                        st.error("Configuração NSGA-II não encontrada no session_state")
+                        raise RuntimeError("Configuração do NSGA-II não carregada. Envie o arquivo de configuração acima.")
+                    st.info(f"Configuração NSGA-II encontrada: {st.session_state.nsga_integration.config}")
+                    # Prepara templates para NSGA-II
+                    st.info("Preparando templates para NSGA-II...")
+                    map_template = Path(simulator_input_dir / "map.txt").read_text()
+                    individuals_template = json.loads(Path(simulator_input_dir / "individuals.json").read_text())
+                    st.info(f"Map template carregado: {len(map_template)} caracteres")
+                    st.info(f"Individuals template carregado: {len(individuals_template)} indivíduos")
                     
-                    # Cria nome único para o experimento
-                    experiment_name = st.session_state.simulator_integration.create_experiment_name()
-                    
-                    # Prepara o experimento
-                    st.session_state.simulator_integration.prepare_experiment_from_uploads(
-                        experiment_name, map_path, individuals_path
+                    st.info("Chamando setup_optimization...")
+                    try:
+                        ok = st.session_state.nsga_integration.setup_optimization(
+                            map_template=map_template,
+                            individuals_template=individuals_template
+                        )
+                        st.info(f"setup_optimization retornou: {ok}")
+                    except Exception as e:
+                        import traceback
+                        st.error(f"Exceção ao chamar setup_optimization: {e}")
+                        st.text("Traceback completo:")
+                        st.code(traceback.format_exc())
+                        ok = False
+                    if not ok:
+                        st.error("setup_optimization retornou False - verifique os logs acima")
+                        raise RuntimeError("Falha ao configurar NSGA-II")
+                    pareto = st.session_state.nsga_integration.run_optimization()
+                    if not pareto:
+                        raise RuntimeError("NSGA-II não retornou resultados")
+                    # salva resultados em uploads/nsga_ii
+                    out_dir_nsga = Path("uploads")/"nsga_ii"
+                    out_dir_nsga.mkdir(parents=True, exist_ok=True)
+                    from datetime import datetime as _dt
+                    nsga_file = out_dir_nsga / f"results_{simulation_name}_{_dt.now().strftime('%Y%m%d_%H%M%S')}.json"
+                    st.session_state.nsga_integration.save_results(pareto, nsga_file)
+                    # marca como sucesso
+                    completed_process = type("Proc", (), {"returncode": 0, "stdout": "NSGA-II concluído", "stderr": ""})()
+                else:
+                    completed_process = st.session_state.simulator_integration.run_simulator_cli(
+                    experiment_name=simulation_name,
+                    draw=True,
+                    scenario_seed=scenario_seed,
+                    simulation_seed=simulation_seed
                     )
-                    
-                    # Executa a simulação
-                    result = st.session_state.simulator_integration.run_simulator_cli(
-                        experiment_name, 
-                        draw=draw_mode,
-                        scenario_seed=scenario_seed,
-                        simulation_seed=simulation_seed
-                    )
-                    
-                    # Lê os resultados
-                    results = st.session_state.simulator_integration.read_results(experiment_name)
-                    
+
+                st.text("STDOUT do simulador:")
+                st.code(completed_process.stdout)
+                st.text("STDERR do simulador:")
+                st.code(completed_process.stderr)
+
+                if completed_process.returncode==0:
                     st.success("Simulação executada com sucesso!")
-                    st.session_state.last_experiment = experiment_name
-                    st.session_state.last_results = results
-                    
-                    # Salva no banco de dados
-                    st.session_state.db_integration.save_simulation(
-                        id_simulacao=1,  # Em produção, gerar ID único
-                        id_mapa=1,       # Em produção, buscar ID do mapa
+                else:
+                    st.error(f"Simulador retornou código {completed_process.returncode}")
+
+                st.session_state.last_results = completed_process
+
+                # ===== Persistência no banco de dados =====
+                try:
+                    db = st.session_state.db_integration
+                    # Salva/obtém ID do mapa
+                    map_id = db.save_map(mapa_nome or simulation_name, str(simulator_input_dir / "map.txt"))
+
+                    # Monta payloads JSON para salvar
+                    cli_config = {
+                        "experiment_name": simulation_name,
+                        "draw": True,
+                        "scenario_seed": scenario_seed,
+                        "simulation_seed": simulation_seed,
+                        "timestamp": datetime.now().isoformat()
+                    }
+                    # Lê conteúdos para armazenar
+                    with open(simulator_input_dir / "individuals.json", "r") as f:
+                        individuals_json_str = f.read()
+                    params_path = Path("temp_simulation") / "parameters.json"
+                    config_simulacao_json_str = params_path.read_text() if params_path.exists() else "{}"
+
+                    # Gera um id_simulacao baseado em timestamp
+                    id_simulacao = int(datetime.now().timestamp())
+
+                    saved = db.save_simulation(
+                        id_simulacao=id_simulacao,
+                        id_mapa=map_id if isinstance(map_id, int) else -1,
                         nome=simulation_name,
                         algoritmo=algorithm,
-                        config_pedestres_json=json.dumps({"uploaded": True}),
-                        pos_pedestres_json=json.dumps({"default": True}),
-                        config_simulacao_json=json.dumps({"draw": draw_mode}),
-                        cli_config_json=json.dumps({"scenario_seed": scenario_seed, "simulation_seed": simulation_seed}),
-                        executada=1
+                        config_pedestres_json=individuals_json_str,
+                        pos_pedestres_json="[]",
+                        config_simulacao_json=config_simulacao_json_str,
+                        cli_config_json=json.dumps(cli_config, ensure_ascii=False),
+                        nsga_config_json=None,
+                        executada=1 if completed_process.returncode==0 else 0
                     )
-                # Limpa arquivos temporários
-                import shutil
-                if temp_dir.exists():
-                    shutil.rmtree(temp_dir, ignore_errors=True)
-                    
-            except Exception as e:
-                st.error(f"Erro na execução da simulação: {e}")
-        
-        st.session_state.run_simulation = False
+                    if saved:
+                        st.success("Resultados registrados no banco de dados.")
+                        # Se NSGA-II, vincula frente de Pareto ao banco
+                        if algorithm == "NSGA-II":
+                            try:
+                                fp_json = nsga_file.read_text()
+                                st.session_state.db_integration.save_nsga_results(id_simulacao, fp_json)
+                            except Exception:
+                                pass
+                    else:
+                        st.warning("Não foi possível salvar os resultados no banco.")
+                except Exception as e:
+                    st.warning(f"Falha ao salvar no banco: {e}")
 
-# ================= VISUALIZAÇÃO DE RESULTADOS =================
-if st.session_state.get('view_results', False):
-    if 'last_results' in st.session_state:
+                # ===== Persistir métricas em output/<experiment>/metrics.json =====
+                try:
+                    out_dir = Path("simulador_heuristica") / "output" / simulation_name
+                    out_dir.mkdir(parents=True, exist_ok=True)
+                    # extração básica do stdout
+                    iters = None
+                    dist = None
+                    mean_distance_series = []
+                    evacuated_progress = []
+                    for line in completed_process.stdout.splitlines():
+                        if line.strip().startswith("qtd iteracoes"):
+                            try:
+                                iters = int(line.split()[-1])
+                            except Exception:
+                                pass
+                        if line.strip().startswith("qtd distancia"):
+                            try:
+                                dist = float(line.split()[-1])
+                            except Exception:
+                                pass
+                    # tenta ler série auxiliar, se produzirmos no futuro
+                    metrics = {}
+                    if iters is not None:
+                        metrics["iterations"] = iters
+                    if dist is not None:
+                        metrics["distance"] = dist
+                    if mean_distance_series:
+                        metrics["mean_distance_series"] = mean_distance_series
+                    if evacuated_progress:
+                        metrics["evacuated_progress"] = evacuated_progress
+                    metrics["algorithm"] = algorithm
+                    metrics["scenario_seed"] = scenario_seed
+                    metrics["simulation_seed"] = simulation_seed
+                    if metrics:
+                        with open(out_dir / "metrics.json", "w") as f:
+                            json.dump(metrics, f, indent=2)
+                except Exception as e:
+                    st.warning(f"Falha ao salvar métricas: {e}")
+
+            except Exception as e:
+                st.error(f"Erro na execução: {e}")
+                # Exibe rastreio de erro como "stderr" para diagnóstico
+                import traceback as _tb
+                st.text("STDERR:")
+                st.code(_tb.format_exc())
+
+            finally:
+                st.session_state.run_sim = False
+
+# ================= RESULTADOS =================
+if st.session_state.view_results:
+    if st.session_state.last_results:
         results = st.session_state.last_results
-        
-        st.markdown("### 📊 Resultados da Simulação")
-        
-        if 'error' in results:
-            st.error(f"Erro: {results['error']}")
-        else:
-            if results['report']:
-                st.markdown(f"**Relatório:** {results['report']}")
-            
-            if results['frames']:
-                st.markdown(f"**Frames gerados:** {len(results['frames'])}")
-                
-                # Mostra algumas imagens dos frames
-                for i, frame in enumerate(results['frames'][:3]):  # Mostra apenas os primeiros 3
-                    st.image(str(frame), caption=f"Frame {i+1}")
-            
-            if results['metrics']:
-                st.markdown(f"**Arquivos de métricas:** {len(results['metrics'])}")
+        st.markdown("### Resultados da Simulação")
+        st.json(results)
     else:
-        st.info("Execute uma simulação primeiro para ver os resultados.")
-    
+        st.info("Execute a simulação primeiro.")
     st.session_state.view_results = False

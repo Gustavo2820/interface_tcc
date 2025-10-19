@@ -9,97 +9,136 @@ import sys
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 import numpy as np
+import streamlit as st
 
 # Adiciona o caminho do simulador ao sys.path para importar módulos
-sys.path.append(str(Path(__file__).parent.parent.parent / "simulador_heuristica"))
+# Usa caminho absoluto baseado na raiz do projeto (duas pastas acima de `services`)
+project_root = Path(__file__).resolve().parents[2]
+simulador_path = project_root / "simulador_heuristica"
+unified_path = simulador_path / "unified"
+simulator_path = simulador_path / "simulator"
+
+# Adiciona os caminhos necessários ao sys.path
+if str(simulador_path) not in sys.path:
+    sys.path.append(str(simulador_path))
+if str(unified_path) not in sys.path:
+    sys.path.append(str(unified_path))
+if str(simulator_path) not in sys.path:
+    sys.path.append(str(simulator_path))
+
+print("DEBUG: Tentando importar módulos NSGA-II...")
+print(f"DEBUG: simulador_path: {simulador_path}")
+print(f"DEBUG: unified_path: {unified_path}")
+print(f"DEBUG: sys.path entries: {[p for p in sys.path if 'simulador' in p]}")
 
 try:
-    from unified.mh_ga_nsgaii import NSGAII, Chromosome
-    from unified.mh_ga_factory import ChromosomeFactory
-    from unified.mh_ga_selectors import TournamentSelector
+    print("DEBUG: Importando pymoo...")
+    from pymoo.algorithms.moo.nsga2 import NSGA2
+    from pymoo.core.problem import Problem
+    from pymoo.optimize import minimize
+    from pymoo.operators.sampling.rnd import BinaryRandomSampling
+    from pymoo.operators.crossover.hux import HalfUniformCrossover
+    from pymoo.operators.mutation.bitflip import BitflipMutation
+    print("DEBUG: Módulos pymoo importados com sucesso")
+    print("DEBUG: NSGA2 =", NSGA2)
+    print("DEBUG: Problem =", Problem)
+    print("DEBUG: minimize =", minimize)
+    st.success("Módulos pymoo importados com sucesso")
 except ImportError as e:
-    print(f"Erro ao importar módulos do NSGA-II: {e}")
+    print(f"DEBUG: Erro ao importar módulos do pymoo: {e}")
+    import traceback
+    print(f"DEBUG: Traceback completo: {traceback.format_exc()}")
+    st.error(f"Erro ao importar módulos do pymoo: {e}")
     # Fallback para quando os módulos não estão disponíveis
-    NSGAII = None
-    Chromosome = None
-    ChromosomeFactory = None
-    TournamentSelector = None
+    NSGA2 = None
+    Problem = None
+    minimize = None
+    BinaryRandomSampling = None
+    HalfUniformCrossover = None
+    BitflipMutation = None
+except Exception as e:
+    print(f"DEBUG: Erro inesperado ao importar módulos: {e}")
+    import traceback
+    print(f"DEBUG: Traceback completo: {traceback.format_exc()}")
+    st.error(f"Erro inesperado ao importar módulos: {e}")
+    # Fallback para quando os módulos não estão disponíveis
+    NSGA2 = None
+    Problem = None
+    minimize = None
+    BinaryRandomSampling = None
+    HalfUniformCrossover = None
+    BitflipMutation = None
 
-# Define uma classe base ChromosomeFactory se a importação falhou
-if ChromosomeFactory is None:
-    class ChromosomeFactory:
-        """Classe base para ChromosomeFactory quando os módulos não estão disponíveis."""
-        def __init__(self, instance):
-            self.instance = instance
+# Define uma classe base Problem se a importação falhou
+if Problem is None:
+    class Problem:
+        """Classe base para Problem quando os módulos não estão disponíveis."""
+        def __init__(self, n_var, n_obj, n_constr=0, xl=0, xu=1, type_var=bool):
+            self.n_var = n_var
+            self.n_obj = n_obj
+            self.n_constr = n_constr
+            self.xl = xl
+            self.xu = xu
+            self.type_var = type_var
         
-        def decode(self, gene):
+        def _evaluate(self, x, out, *args, **kwargs):
             raise NotImplementedError
-        
-        def new(self):
-            raise NotImplementedError
-        
-        def crossover(self, parent_a, parent_b):
-            raise NotImplementedError
-        
-        def mutate(self, gene):
-            raise NotImplementedError
-        
-        def build(self, generation, gene):
-            raise NotImplementedError
-
-# Define uma classe base Chromosome se a importação falhou
-if Chromosome is None:
-    class Chromosome:
-        """Classe base para Chromosome quando os módulos não estão disponíveis."""
-        def __init__(self, generation, gene, obj):
-            self.generation = generation
-            self.gene = gene
-            self.obj = obj
-            self.rank = 0
-            self.dist = 0.0
 
 
-class EvacuationChromosomeFactory(ChromosomeFactory):
+class EvacuationProblem(Problem):
     """
-    Fábrica de cromossomos para problemas de evacuação.
+    Problema de evacuação para pymoo NSGA-II.
     
-    Esta classe implementa a interface necessária para o NSGA-II,
-    adaptando o problema de evacuação para o formato genético.
+    Esta classe implementa a interface necessária para o pymoo,
+    adaptando o problema de evacuação para otimização multiobjetivo.
     """
     
-    def __init__(self, simulator_integration, map_template: str, individuals_template: Dict):
+    def __init__(self, simulator_integration, map_template: str, individuals_template: Dict, door_positions: List[tuple]):
         """
-        Inicializa a fábrica de cromossomos.
+        Inicializa o problema de evacuação.
         
         Args:
             simulator_integration: Instância da integração com o simulador
             map_template: Template do mapa base
             individuals_template: Template dos indivíduos base
+            door_positions: Lista de posições possíveis para portas
         """
         self.simulator_integration = simulator_integration
         self.map_template = map_template
         self.individuals_template = individuals_template
+        self.door_positions = door_positions
         self.evaluation_count = 0
+        
+        # Define um problema com 2 objetivos e n variáveis binárias (uma para cada posição de porta)
+        n_var = len(door_positions)
+        super().__init__(n_var=n_var, n_obj=2, n_constr=0, xl=0, xu=1, type_var=bool)
     
-    def build(self, generation: int, gene: Any) -> Chromosome:
+    def _evaluate(self, x, out, *args, **kwargs):
         """
-        Constrói um cromossomo a partir de um gene.
+        Avalia uma população de soluções.
         
         Args:
-            generation: Geração do cromossomo
-            gene: Gene que representa a solução
+            x: Matriz de soluções (pop_size x n_var)
+            out: Dicionário de saída onde 'F' contém os objetivos
+        """
+        results = np.apply_along_axis(self._evaluate_single, 1, x)
+        out["F"] = results
+    
+    def _evaluate_single(self, gene):
+        """
+        Avalia uma única solução.
+        
+        Args:
+            gene: Vetor binário representando quais portas usar
             
         Returns:
-            Cromossomo com os objetivos avaliados
+            Lista com os valores dos objetivos
         """
-        if Chromosome is None:
-            raise ImportError("Módulos do NSGA-II não disponíveis")
-        
         # Decodifica o gene para posições de portas
         door_positions = self._decode_gene(gene)
         
         # Gera arquivos de entrada para o simulador
-        experiment_name = f"nsga_eval_{self.evaluation_count}_{generation}"
+        experiment_name = f"nsga_eval_{self.evaluation_count}"
         self.evaluation_count += 1
         
         # Cria o mapa com as portas posicionadas
@@ -133,12 +172,12 @@ class EvacuationChromosomeFactory(ChromosomeFactory):
             # Extrai métricas dos objetivos
             objectives = self._extract_objectives(results)
             
-            return Chromosome(generation, gene, objectives)
+            return objectives
             
         except Exception as e:
             print(f"Erro na avaliação do cromossomo: {e}")
             # Retorna valores padrão em caso de erro
-            return Chromosome(generation, gene, [float('inf'), float('inf')])
+            return [float('inf'), float('inf')]
         
         finally:
             # Limpa arquivos temporários
@@ -148,18 +187,20 @@ class EvacuationChromosomeFactory(ChromosomeFactory):
     
     def _decode_gene(self, gene: Any) -> List[tuple]:
         """
-        Decodifica um gene para posições de portas.
+        Decodifica um gene binário para posições de portas.
         
         Args:
-            gene: Gene a ser decodificado
+            gene: Vetor binário onde 1 indica que a porta deve ser usada
             
         Returns:
             Lista de tuplas (x, y) com posições das portas
         """
-        # Implementação simplificada - assume que o gene é uma lista de posições
-        if isinstance(gene, list):
-            return [(int(x), int(y)) for x, y in gene if len(gene) >= 2]
-        return []
+        # Converte gene binário para posições de portas
+        door_positions = []
+        for i, bit in enumerate(gene):
+            if bit == 1 and i < len(self.door_positions):
+                door_positions.append(self.door_positions[i])
+        return door_positions
     
     def _generate_map_with_doors(self, door_positions: List[tuple]) -> str:
         """
@@ -247,76 +288,120 @@ class NSGAIntegration:
         self, 
         map_template: str, 
         individuals_template: Dict,
+        door_positions: List[tuple],
         initial_population: Optional[List] = None
     ) -> bool:
         """
-        Configura a otimização NSGA-II.
+        Configura a otimização NSGA-II com pymoo.
         
         Args:
             map_template: Template do mapa base
             individuals_template: Template dos indivíduos base
+            door_positions: Lista de posições possíveis para portas
             initial_population: População inicial (opcional)
             
         Returns:
             True se configurou com sucesso, False caso contrário
         """
-        if NSGAII is None:
-            print("NSGA-II não disponível")
-            return False
-        
         try:
-            # Cria a fábrica de cromossomos
-            self.factory = EvacuationChromosomeFactory(
+            print("DEBUG: Iniciando setup_optimization...")
+            st.info("Iniciando setup_optimization...")
+            
+            # Check if pymoo modules are available
+            print("DEBUG: Verificando módulos pymoo...")
+            if NSGA2 is None or Problem is None or minimize is None:
+                print("DEBUG: Módulos pymoo não disponíveis")
+                st.error("Módulos pymoo não disponíveis")
+                return False
+            
+            print(f"DEBUG: hasattr config: {hasattr(self, 'config')}")
+            if not hasattr(self, 'config'):
+                print("DEBUG: Configuração NSGA-II não carregada")
+                st.error("Configuração NSGA-II não carregada")
+                return False
+            
+            st.info(f"Configuração NSGA-II: {self.config}")
+            st.info(f"Map template length: {len(map_template)}")
+            st.info(f"Individuals template keys: {list(individuals_template.keys()) if isinstance(individuals_template, dict) else 'Not a dict'}")
+            st.info(f"Door positions: {len(door_positions)}")
+            
+            print("DEBUG: Criando EvacuationProblem...")
+            st.info("Criando EvacuationProblem...")
+            # Cria o problema de evacuação
+            self.problem = EvacuationProblem(
                 self.simulator_integration, 
                 map_template, 
-                individuals_template
+                individuals_template,
+                door_positions
             )
+            print("DEBUG: Problem criado com sucesso")
+            st.success("Problem criado com sucesso")
             
-            # Cria o seletor
-            selector = TournamentSelector(tournament_size=2)
-            
-            # Cria o NSGA-II
-            self.nsga = NSGAII(
-                population_size=self.config['population_size'],
-                generations=self.config['generations'],
-                factory=self.factory,
-                selector=selector,
-                crossover_rate=self.config['crossover_rate'],
-                mutation_rate=self.config['mutation_rate']
+            st.info("Configurando algoritmo NSGA-II...")
+            # Cria o algoritmo NSGA-II
+            self.algorithm = NSGA2(
+                pop_size=self.config['population_size'],
+                sampling=BinaryRandomSampling(),
+                crossover=HalfUniformCrossover(),
+                mutation=BitflipMutation(prob=self.config['mutation_rate']),
+                eliminate_duplicates=True
             )
+            st.success("Algoritmo NSGA-II configurado com sucesso")
             
+            st.success("setup_optimization concluído com sucesso!")
             return True
             
         except Exception as e:
-            print(f"Erro ao configurar otimização: {e}")
+            import traceback
+            st.error(f"Erro ao configurar otimização: {e}")
+            st.text("Traceback completo:")
+            st.code(traceback.format_exc())
             return False
     
-    def run_optimization(self) -> Optional[List[Chromosome]]:
+    def run_optimization(self) -> Optional[Dict]:
         """
-        Executa a otimização NSGA-II.
+        Executa a otimização NSGA-II com pymoo.
         
         Returns:
-            Lista de cromossomos da frente de Pareto, ou None em caso de erro
+            Resultado da otimização do pymoo, ou None em caso de erro
         """
-        if self.nsga is None:
+        if not hasattr(self, 'problem') or not hasattr(self, 'algorithm'):
             print("NSGA-II não configurado")
             return None
         
         try:
-            # Executa a otimização
-            pareto_front = self.nsga.run()
-            return pareto_front
+            print(f"DEBUG: Iniciando otimização pymoo...")
+            print(f"  - population_size: {self.config['population_size']}")
+            print(f"  - generations: {self.config['generations']}")
+            print(f"  - mutation_rate: {self.config['mutation_rate']}")
+            
+            # Executa a otimização usando pymoo
+            res = minimize(
+                self.problem,
+                self.algorithm,
+                termination=('n_gen', self.config['generations']),
+                seed=1,
+                verbose=True
+            )
+            
+            print(f"DEBUG: Otimização concluída")
+            print(f"  - Soluções encontradas: {len(res.X)}")
+            print(f"  - Objetivos: {len(res.F)}")
+            
+            return res
             
         except Exception as e:
+            import traceback
             print(f"Erro na execução da otimização: {e}")
+            print(f"Traceback completo: {traceback.format_exc()}")
             return None
     
-    def save_results(self, pareto_front: List[Chromosome], output_file: Path) -> bool:
+    def save_results(self, result: Dict, output_file: Path) -> bool:
         """
-        Salva os resultados da otimização.
+        Salva os resultados da otimização pymoo.
         
         Args:
-            pareto_front: Frente de Pareto resultante
+            result: Resultado da otimização do pymoo
             output_file: Arquivo de saída
             
         Returns:
@@ -324,13 +409,19 @@ class NSGAIntegration:
         """
         try:
             results = []
-            for chromosome in pareto_front:
+            for i, (solution, objectives) in enumerate(zip(result.X, result.F)):
+                # Decodifica a solução para posições de portas
+                door_positions = []
+                for j, bit in enumerate(solution):
+                    if bit == 1 and j < len(self.problem.door_positions):
+                        door_positions.append(self.problem.door_positions[j])
+                
                 results.append({
-                    "generation": chromosome.generation,
-                    "gene": chromosome.gene,
-                    "objectives": chromosome.obj,
-                    "rank": chromosome.rank,
-                    "distance": chromosome.dist
+                    "solution_id": i,
+                    "gene": solution.tolist(),
+                    "door_positions": door_positions,
+                    "objectives": objectives.tolist(),
+                    "num_doors": sum(solution)
                 })
             
             with open(output_file, 'w') as f:

@@ -1,0 +1,113 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Streamlit
+.streamlit/
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+simulador.db
+
+# Configuration files
+temp_*.json
+config_*.json
+*_config.json
+
+# Upload directories
+uploads/
+temp_nsga/
+temp_simulation/
+temp_test/
+
+# Map files
+*.map
+*.png
+mapas/
+
+# Output directories
+output/
+tuning_results/
+temp_*/
+
+# Log files
+*.log
+logs/
+
+# Results and data files
+results/
+*.csv
+*.json
+res.json
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.backup
+
+# Experiment data
+experiment_*/
+sim_*/
+nsga_eval_*/
+
+# Cache directories
+.cache/
+cache/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# pytest
+.pytest_cache/
+.coverage
+htmlcov/
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json

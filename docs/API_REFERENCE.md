@@ -1,608 +1,211 @@
-﻿# Referência da API
+﻿# pages/simulacao.py
+"""
+Interface para configuração de simulações de evacuação.
 
-## Visão Geral
+Permite:
+- Seleção de mapas
+- Upload de indivíduos
+- Criação ou upload de parâmetros
+- Execução da simulação
+- Visualização de resultados
+"""
+import streamlit as st
+from pathlib import Path
+from PIL import Image
+import json
+import sys
+import shutil
 
-Esta documentação descreve todas as funções e classes públicas do sistema de simulação de evacuação de multidões, incluindo assinaturas, parâmetros, retornos e exceções.
+# =================== STATE ===================
+if 'run_simulation' not in st.session_state:
+    st.session_state.run_simulation = False
+if 'view_results' not in st.session_state:
+    st.session_state.view_results = False
+if 'last_results' not in st.session_state:
+    st.session_state.last_results = None
+if 'last_experiment' not in st.session_state:
+    st.session_state.last_experiment = None
 
-## Scripts de Execução
+# Adiciona caminho dos serviços
+sys.path.append(str(Path(__file__).parent.parent))
 
-### sim_ca_main3.py
+from services.simulator_integration import SimulatorIntegration, DatabaseIntegration
+from services.map_creation_integration import map_creation_service
 
-#### Função Principal
-`python
-def main():
-    """Executa NSGA-II com cache para otimização multiobjetivo.
-    
-    Parâmetros de linha de comando:
-        -e, --experiment: Nome do experimento (obrigatório)
-        --pop_size: Tamanho da população (padrão: 10)
-        --mut_prob: Probabilidade de mutação (padrão: 0.4)
-        --max_gen: Número máximo de gerações (padrão: 300)
-        --seed: Semente para gerador aleatório (padrão: 75)
-        -o, --out: Pasta de saída (padrão: 'results')
-    
-    Saída:
-        res.json: Arquivo com resultados da otimização
-    
-    Exceções:
-        FileNotFoundError: Se experimento não for encontrado
-        ValueError: Se parâmetros forem inválidos
-    """
-`
+# ================= CONFIGURAÇÃO DA PÁGINA =================
+st.set_page_config(page_title="Simulação", layout="wide")
 
-#### Funções Auxiliares
-`python
-def save_result(result, uncoded, filename):
-    """Salva resultados da otimização em arquivo JSON.
-    
-    Args:
-        result: Lista de objetos Chromosome com resultados
-        uncoded: Lista de configurações decodificadas
-        filename: Nome do arquivo de saída
-    
-    Returns:
-        None
-    
-    Raises:
-        IOError: Se não conseguir escrever arquivo
-    """
-`
+# ================= CSS =================
+st.markdown("""
+<style>
+body { font-family: 'Inter', 'Roboto', sans-serif; background-color: white; color: #222; }
+.menu { display:flex; justify-content:center; gap:40px; margin-bottom:40px; font-size:20px; font-weight:600; }
+.menu a { text-decoration:none; color:#bbb; transition:color 0.2s; }
+.menu a:hover { color:#fff; }
+.menu a.active { color:#fff; font-weight:700; border-bottom:2px solid #1e90ff; padding-bottom:4px; }
+.botoes { display:flex; justify-content:flex-end; gap:20px; margin-right:40px; margin-bottom:30px; }
+.botao { background-color:#142b3b; color:white; border:none; border-radius:8px; padding:10px 24px; font-size:16px; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:8px; }
+.botao:hover { transform:scale(1.05); background-color:#1d3d57; }
+.container { display:flex; flex-direction:row; justify-content:center; align-items:flex-start; gap:60px; width:100%; }
+.painel-esquerda { display:flex; flex-direction:column; gap:25px; }
+.bloco { background-color:#142b3b; color:white; text-align:center; border-radius:10px; padding:10px 0; font-weight:bold; }
+.input { background-color:#b3b3b3; border:none; border-radius:6px; padding:6px; color:black; width:200px; text-align:center; }
+.mapa { border:1px solid #ccc; border-radius:6px; width:800px; height:600px; display:flex; justify-content:center; align-items:center; }
+</style>
+""", unsafe_allow_html=True)
 
-### sim_ca_main4.py
+# ================= MENU =================
+st.markdown("""
+<div class="menu">
+    <a href="../app">Menu</a>
+    <a href="./Mapas" class="active">Mapas</a>
+    <a href="./Criacao_Mapas">Criação de Mapas</a>
+    <a href="./Parâmetros">Parâmetros</a>
+    <a href="./Resultados">Resultados</a>
+    <a href="./Documentação">Documentação</a>
+</div>
+""", unsafe_allow_html=True)
 
-#### Função Principal
-`python
-def main():
-    """Executa força bruta para exploração exaustiva.
-    
-    Parâmetros de linha de comando:
-        -e, --experiment: Nome do experimento (obrigatório)
-        --seed: Semente para gerador aleatório (padrão: 75)
-        -o, --out: Pasta de saída (padrão: 'results')
-    
-    Saída:
-        res.json: Arquivo com resultados da otimização
-    
-    Exceções:
-        FileNotFoundError: Se experimento não for encontrado
-        MemoryError: Se houver explosão combinatória
-    """
-`
+# ================= INICIALIZAÇÃO DOS SERVIÇOS =================
+if 'simulator_integration' not in st.session_state:
+    st.session_state.simulator_integration = SimulatorIntegration()
+if 'db_integration' not in st.session_state:
+    st.session_state.db_integration = DatabaseIntegration()
 
-## Módulos Core - Meta-heurísticas
+# ================= MAPA =================
+params = st.query_params
+mapa_nome = params.get("mapa", [""])[0] if isinstance(params.get("mapa"), list) else params.get("mapa", "")
 
-### mh_ga_nsgaii.py
+mapas_dir = Path("mapas")
+mapas_dir.mkdir(exist_ok=True)
+map_options = sorted([p.stem for p in mapas_dir.glob("*.png")])
 
-#### Classe Chromosome
-`python
-class Chromosome:
-    """Representa um indivíduo no algoritmo genético.
-    
-    Attributes:
-        generation (int): Geração de nascimento do indivíduo
-        gene (object): Representação genética da solução
-        obj (list): Valores dos objetivos [doors, iterations, distance]
-        rank (int): Frente de dominância (0 = melhor)
-        dist (float): Distância de crowding
-    
-    Methods:
-        __init__(generation, gene, obj): Inicializa cromossomo
-        __lt__(other): Comparação para ordenação
-        __eq__(other): Verifica igualdade
-    """
-    
-    def __init__(self, generation, gene, obj):
-        """Inicializa um cromossomo.
+# ================= BOTÕES =================
+col_btn1, col_btn2, col_btn3 = st.columns([1,1,1])
+
+with col_btn1:
+    if st.button("💾 Salvar Configuração", key="save_config"):
+        st.success("Configuração salva!")
+
+with col_btn2:
+    if st.button("▶️ Executar Simulação", key="run_simulation"):
+        st.session_state.run_simulation = True
+
+with col_btn3:
+    if st.button("📊 Ver Resultados", key="view_results"):
+        st.session_state.view_results = True
+
+# ================= CONTEÚDO =================
+col1, col2 = st.columns([1,3])
+
+with col1:
+    st.markdown('<div class="bloco">Nome da Simulação</div>', unsafe_allow_html=True)
+    simulation_name = st.text_input("", value=f"sim_{mapa_nome}", key="sim_name")
+
+    st.markdown('<div class="bloco">Algoritmo</div>', unsafe_allow_html=True)
+    algorithm = st.selectbox("", ["Simulação Direta", "Algoritmo Genético", "NSGA-II", "Força Bruta"], key="algorithm")
+
+    st.markdown('<div class="bloco">Mapa</div>', unsafe_allow_html=True)
+    selected_map = st.selectbox("", options=["(selecione)"] + map_options, 
+                                index=(map_options.index(mapa_nome)+1) if mapa_nome in map_options else 0, key="selected_map")
+    if selected_map != "(selecione)" and selected_map != mapa_nome:
+        mapa_nome = selected_map
+        st.session_state["selected_map_name"] = mapa_nome
+
+    st.markdown('<div class="bloco">Arquivo de Parâmetros</div>', unsafe_allow_html=True)
+    param_file = st.file_uploader("Upload JSON/TXT de parâmetros", type=["json", "txt"], key="param_file")
+
+    # ================= FORMULÁRIO PARA CRIAR PARÂMETROS =================
+    with st.expander("📝 Criar Parâmetros Manualmente"):
+        with st.form("form_params"):
+            pop_size = st.number_input("Tamanho da população (NSGA-II)", min_value=1, value=10)
+            mut_prob = st.number_input("Probabilidade de mutação (NSGA-II)", min_value=0.0, max_value=1.0, value=0.4, step=0.05)
+            max_gen = st.number_input("Máximo de gerações (NSGA-II)", min_value=1, value=300)
+            scenario_seed = st.number_input("Seed do cenário", value=75, min_value=0)
+            simulation_seed = st.number_input("Seed da simulação", value=75, min_value=0)
+            draw_mode = st.checkbox("Gerar imagens", value=True)
+            submit_params = st.form_submit_button("Criar Parâmetros")
         
-        Args:
-            generation (int): Geração de nascimento
-            gene (object): Representação genética
-            obj (list): Valores dos objetivos [doors, iterations, distance]
-        """
-`
+        if submit_params:
+            params_data = {
+                "pop_size": pop_size,
+                "mut_prob": mut_prob,
+                "max_gen": max_gen,
+                "scenario_seed": scenario_seed,
+                "simulation_seed": simulation_seed,
+                "draw": draw_mode
+            }
+            temp_params_path = Path("temp_params.json")
+            with open(temp_params_path, 'w') as f:
+                json.dump(params_data, f, indent=2)
+            st.success("Parâmetros criados com sucesso!")
+            param_file = temp_params_path  # substitui arquivo upload
 
-#### Classe ChromosomeFactory
-`python
-class ChromosomeFactory:
-    """Factory para criação de cromossomos.
-    
-    Methods:
-        create_chromosome(generation, gene): Cria novo cromossomo
-        decode(gene): Decodifica gene em solução
-    """
-    
-    def create_chromosome(self, generation, gene):
-        """Cria um novo cromossomo.
-        
-        Args:
-            generation (int): Geração de nascimento
-            gene (object): Representação genética
-        
-        Returns:
-            Chromosome: Novo cromossomo
-        """
-`
+    st.markdown('<div class="bloco">Arquivo de Indivíduos</div>', unsafe_allow_html=True)
+    individuals_file = st.file_uploader("Upload de indivíduos JSON", type=["json"], key="individuals_file")
 
-#### Função Principal
-`python
-def nsgaii(factory, selector, pop_size, mut_prob, max_gen):
-    """Executa algoritmo NSGA-II.
-    
-    Args:
-        factory (ChromosomeFactory): Factory para criação de cromossomos
-        selector (function): Função de seleção
-        pop_size (int): Tamanho da população
-        mut_prob (float): Probabilidade de mutação
-        max_gen (int): Número máximo de gerações
-    
-    Returns:
-        list: Lista de cromossomos da frente de Pareto
-    
-    Complexity:
-        O(n²) para ordenação não-dominada
-    
-    Raises:
-        ValueError: Se parâmetros forem inválidos
-        MemoryError: Se população for muito grande
-    """
-`
+with col2:
+    if mapa_nome:
+        mapa_path = Path("mapas") / f"{mapa_nome}.png"
+        if mapa_path.exists():
+            img = Image.open(mapa_path)
+            st.image(img, use_container_width=True)
+        else:
+            st.warning("Mapa não encontrado.")
+    else:
+        st.info("Selecione um mapa para visualizar.")
 
-### mh_ga_factory.py
+# ================= EXECUÇÃO =================
+if st.session_state.get('run_simulation', False):
+    if not mapa_nome:
+        st.error("Selecione um mapa primeiro.")
+    elif not individuals_file:
+        st.error("Faça upload do arquivo de indivíduos.")
+    elif not param_file:
+        st.error("Informe ou crie os parâmetros.")
+    else:
+        with st.spinner("Executando simulação..."):
+            try:
+                temp_dir = Path("temp_simulation")
+                temp_dir.mkdir(exist_ok=True)
+                
+                # Salva indivíduos
+                individuals_path = temp_dir / "individuals.json"
+                if hasattr(individuals_file, "read"):
+                    data = json.load(individuals_file)
+                    with open(individuals_path, 'w') as f:
+                        json.dump(data, f, indent=2)
+                else:
+                    shutil.copy(param_file, individuals_path)  # caso seja arquivo temporário
 
-#### Classe Gene
-`python
-class Gene:
-    """Representa um gene (configuração de portas).
-    
-    Attributes:
-        configuration (list): Lista booleana indicando portas ativas
-    
-    Methods:
-        __init__(configuration): Inicializa gene
-    """
-    
-    def __init__(self, configuration):
-        """Inicializa um gene.
-        
-        Args:
-            configuration (list): Lista booleana de portas
-        """
-`
+                # Salva parâmetros
+                params_path = temp_dir / "parameters.json"
+                if hasattr(param_file, "read"):
+                    param_data = json.load(param_file)
+                    with open(params_path, 'w') as f:
+                        json.dump(param_data, f, indent=2)
+                else:
+                    shutil.copy(param_file, params_path)
 
-#### Classe Factory
-`python
-class Factory(ChromosomeFactory):
-    """Factory para criação de genes e cromossomos.
-    
-    Attributes:
-        instance (Instance): Instância do experimento
-        exits (list): Lista de configurações de portas
-        cache (dict): Cache para evitar recálculos
-    
-    Methods:
-        decode(gene): Decodifica gene em solução
-        create_gene(): Cria gene aleatório
-        create_chromosome(generation, gene): Cria cromossomo
-    """
-    
-    def __init__(self, instance):
-        """Inicializa factory.
-        
-        Args:
-            instance (Instance): Instância do experimento
-        """
-    
-    def decode(self, gene):
-        """Decodifica gene em solução.
-        
-        Args:
-            gene (Gene): Gene a ser decodificado
-        
-        Returns:
-            tuple: (doors_count, iterations, distance)
-        
-        Complexity:
-            O(individuals  iterations) para simulação
-        
-        Raises:
-            ValueError: Se gene for inválido
-        """
-`
+                # Executa simulação
+                simulator = st.session_state.simulator_integration
+                result = simulator.run_simulator_cli(
+                    experiment_name=simulation_name,
+                    draw=draw_mode,
+                    scenario_seed=scenario_seed,
+                    simulation_seed=simulation_seed
+                )
+                
+                st.success("Simulação finalizada!")
+                st.session_state.last_results = result
+                st.session_state.run_simulation = False
+            except Exception as e:
+                st.error(f"Erro ao executar simulação: {e}")
 
-### mh_ga_instance.py
-
-#### Classe Instance
-`python
-class Instance:
-    """Representa uma instância de experimento.
-    
-    Attributes:
-        experiment (str): Nome do experimento
-        draw (bool): Se deve desenhar visualizações
-        scenario_seed (list): Lista de sementes para cenários
-        simulation_seed (int): Semente para simulação
-    """
-    
-    def __init__(self, experiment, draw, scenario_seed, simulation_seed):
-        """Inicializa instância.
-        
-        Args:
-            experiment (str): Nome do experimento
-            draw (bool): Se deve desenhar
-            scenario_seed (list): Sementes de cenário
-            simulation_seed (int): Semente de simulação
-        """
-`
-
-#### Função de Leitura
-`python
-def read_instance(experiment):
-    """Lê configuração de experimento.
-    
-    Args:
-        experiment (str): Nome do experimento
-    
-    Returns:
-        Instance: Instância configurada
-    
-    Raises:
-        FileNotFoundError: Se arquivo não for encontrado
-        json.JSONDecodeError: Se JSON for inválido
-    """
-`
-
-## Módulos Core - Heurísticas
-
-### h_brute_force.py
-
-#### Classe BruteForce
-`python
-class BruteForce:
-    """Implementa algoritmo de força bruta.
-    
-    Attributes:
-        exits (list): Lista de configurações de portas
-        instance (Instance): Instância do experimento
-    
-    Methods:
-        pareto(): Executa força bruta e retorna frente de Pareto
-        decode(combination): Decodifica combinação em solução
-    """
-    
-    def __init__(self, instance):
-        """Inicializa força bruta.
-        
-        Args:
-            instance (Instance): Instância do experimento
-        """
-    
-    def pareto(self):
-        """Executa força bruta e retorna frente de Pareto.
-        
-        Returns:
-            list: Lista de soluções da frente de Pareto
-        
-        Complexity:
-            O(2^n) onde n é número de portas
-        
-        Raises:
-            MemoryError: Se houver explosão combinatória
-        """
-    
-    def decode(self, combination):
-        """Decodifica combinação em solução.
-        
-        Args:
-            combination (tuple): Combinação de portas
-        
-        Returns:
-            tuple: (doors_count, iterations, distance)
-        """
-`
-
-## Módulos Core - Simulação
-
-### sim_ca_scenario.py
-
-#### Classe Scenario
-`python
-class Scenario:
-    """Gerencia cenários de simulação.
-    
-    Attributes:
-        directory (str): Diretório do experimento
-        structure_map (StructureMap): Mapa estrutural
-        doors_configurations (list): Configurações de portas
-        wall_map (WallMap): Mapa de paredes
-        static_map (StaticMap): Mapa estático
-        crowd_map (CrowdMap): Mapa da multidão
-        dinamic_map (DinamicMap): Mapa dinâmico
-        individuals (list): Lista de indivíduos
-    
-    Methods:
-        map_reset(doors): Reinicia mapa com portas
-        scenario_reset(scenario_seed, simulation_seed): Reinicia cenário
-        load_*(): Carrega diferentes tipos de mapa
-    """
-    
-    def __init__(self, experiment, doors=None, draw=False, 
-                 scenario_seed=0, simulation_seed=0, 
-                 individuals_position=False):
-        """Inicializa cenário.
-        
-        Args:
-            experiment (str): Nome do experimento
-            doors (list, optional): Lista de portas
-            draw (bool): Se deve desenhar
-            scenario_seed (int): Semente do cenário
-            simulation_seed (int): Semente da simulação
-            individuals_position (bool): Se deve posicionar indivíduos
-        """
-    
-    def map_reset(self, doors):
-        """Reinicia mapa com configuração de portas.
-        
-        Args:
-            doors (list): Lista de portas ativas
-        """
-    
-    def scenario_reset(self, scenario_seed, simulation_seed):
-        """Reinicia cenário com novas sementes.
-        
-        Args:
-            scenario_seed (int): Nova semente do cenário
-            simulation_seed (int): Nova semente da simulação
-        """
-`
-
-### sim_ca_simulator.py
-
-#### Classe Simulator
-`python
-class Simulator:
-    """Executa simulação de evacuação.
-    
-    Attributes:
-        structure_map (StructureMap): Mapa estrutural
-        wall_map (WallMap): Mapa de paredes
-        static_map (StaticMap): Mapa estático
-        crowd_map (CrowdMap): Mapa da multidão
-        dinamic_map (DinamicMap): Mapa dinâmico
-        individuals (list): Lista de indivíduos
-        iteration (int): Iteração atual
-        log (Logs): Sistema de logs
-    
-    Methods:
-        simulate(): Executa simulação completa
-        check_evacuated_individuals(): Verifica se todos evacuaram
-        sort_individuals_by_distance(): Ordena indivíduos por distância
-    """
-    
-    def __init__(self, scenario):
-        """Inicializa simulador.
-        
-        Args:
-            scenario (Scenario): Cenário de simulação
-        """
-    
-    def simulate(self):
-        """Executa simulação de evacuação.
-        
-        Returns:
-            tuple: (iterations, total_distance)
-        
-        Complexity:
-            O(iterations  individuals)
-        
-        Raises:
-            RuntimeError: Se simulação falhar
-        """
-    
-    def check_evacuated_individuals(self):
-        """Verifica se todos os indivíduos evacuaram.
-        
-        Returns:
-            bool: True se todos evacuaram
-        """
-`
-
-### sim_ca_individual.py
-
-#### Classe Individual
-`python
-class Individual:
-    """Representa um indivíduo na simulação.
-    
-    Attributes:
-        label (str): Rótulo do indivíduo
-        color (tuple): Cor RGB
-        speed (int): Velocidade de movimento
-        KD (float): Constante do mapa dinâmico
-        KS (float): Constante do mapa estático
-        KW (float): Constante do mapa de paredes
-        KI (float): Constante de inércia
-        row (int): Posição Y atual
-        col (int): Posição X atual
-        evacuated (bool): Se já evacuou
-        steps (int): Passos dados
-    
-    Methods:
-        move(): Move indivíduo
-        calculate_direction(): Calcula direção de movimento
-    """
-    
-    def __init__(self, configuration, col, row):
-        """Inicializa indivíduo.
-        
-        Args:
-            configuration (dict): Configuração do indivíduo
-            col (int): Posição X inicial
-            row (int): Posição Y inicial
-        """
-    
-    def move(self, structure_map, wall_map, static_map, 
-             crowd_map, dinamic_map):
-        """Move indivíduo na simulação.
-        
-        Args:
-            structure_map (StructureMap): Mapa estrutural
-            wall_map (WallMap): Mapa de paredes
-            static_map (StaticMap): Mapa estático
-            crowd_map (CrowdMap): Mapa da multidão
-            dinamic_map (DinamicMap): Mapa dinâmico
-        
-        Returns:
-            dict: Informações do movimento
-        """
-`
-
-## Módulos de Mapa
-
-### sim_ca_crowd_map.py
-
-#### Classe CrowdMap
-`python
-class CrowdMap:
-    """Gerencia posições dos indivíduos no mapa.
-    
-    Attributes:
-        label (str): Nome do mapa
-        structure_map (StructureMap): Mapa estrutural
-        map (list): Matriz de posições
-        len_row (int): Largura do mapa
-        len_col (int): Altura do mapa
-    
-    Methods:
-        load_map(individuals): Carrega mapa com indivíduos
-        place_individuals(individuals): Posiciona indivíduos
-        draw_map(directory, iteration): Desenha mapa
-        update_individual_position(): Atualiza posição
-        check_empty_position(): Verifica se posição está vazia
-    """
-    
-    def __init__(self, label, structure_map):
-        """Inicializa mapa da multidão.
-        
-        Args:
-            label (str): Nome do mapa
-            structure_map (StructureMap): Mapa estrutural
-        """
-    
-    def load_map(self, individuals):
-        """Carrega mapa com indivíduos.
-        
-        Args:
-            individuals (list): Lista de indivíduos
-        """
-    
-    def draw_map(self, directory, iteration):
-        """Desenha mapa em arquivo.
-        
-        Args:
-            directory (str): Diretório de saída
-            iteration (int): Iteração atual
-        """
-`
-
-### sim_ca_constants.py
-
-#### Classe Constants
-`python
-class Constants:
-    """Define constantes do sistema.
-    
-    Constantes de Mapa:
-        M_EMPTY: Célula vazia
-        M_WALL: Parede
-        M_DOOR: Porta
-        M_OBJECT: Objeto
-        M_VOID: Vazio
-    
-    Constantes de Campo:
-        S_WALL: Campo de parede
-    
-    Constantes de Direção:
-        D_TOP: Cima
-        D_TOP_RIGHT: Cima-direita
-        D_RIGHT: Direita
-        D_BOTTOM_RIGHT: Baixo-direita
-        D_BOTTOM: Baixo
-        D_BOTTOM_LEFT: Baixo-esquerda
-        D_LEFT: Esquerda
-        D_TOP_LEFT: Cima-esquerda
-    
-    Constantes de Cor:
-        C_WHITE: Branco
-        C_BLACK: Preto
-        C_GRAY: Cinza
-        C_LIGHT_BLACK: Preto claro
-        C_RED: Vermelho
-    
-    Constantes de Difusão:
-        DIFUSIONDECAY_ALFA: Alfa
-        DIFUSIONDECAY_SIGMA: Sigma
-        DISTANCE_MULTIPLIER: Multiplicador de distância
-    """
-`
-
-## Exceções Personalizadas
-
-### SimulatorError
-`python
-class SimulatorError(Exception):
-    """Exceção base para erros de simulação."""
-    pass
-`
-
-### ConfigurationError
-`python
-class ConfigurationError(SimulatorError):
-    """Exceção para erros de configuração."""
-    pass
-`
-
-### MapError
-`python
-class MapError(SimulatorError):
-    """Exceção para erros de mapa."""
-    pass
-`
-
-## Dependências Externas
-
-### numpy
-- **Versão**: 1.19.5
-- **Uso**: Computação numérica, operações vetoriais
-- **Módulos**: ndarray, random
-
-### matplotlib
-- **Versão**: 3.3.4
-- **Uso**: Visualização de dados, gráficos
-- **Módulos**: pyplot, figure
-
-### Pillow
-- **Versão**: 8.1.0
-- **Uso**: Processamento de imagens
-- **Módulos**: Image, ImageDraw
-
-### pymoo
-- **Versão**: Não especificada
-- **Uso**: Algoritmos evolutivos (arquivos z*)
-- **Módulos**: NSGA2, Problem, minimize
-
-## Considerações de Performance
-
-### Complexidade Assintótica
-- **NSGA-II**: O(n²) para ordenação não-dominada
-- **Força Bruta**: O(2^n) para exploração exaustiva
-- **Simulação**: O(iterations  individuals)
-
-### Otimizações
-- **Cache**: Evita recálculos em mh_ga_factory.py
-- **Early Termination**: Para quando todos evacuam
-- **Vectorization**: Uso de numpy para operações vetoriais
-
-### Limitações
-- **Memória**: Explosão combinatória em força bruta
-- **Thread Safety**: Módulos não são thread-safe
-- **Cache Invalidation**: Cache pode ser invalidado
+# ================= RESULTADOS =================
+if st.session_state.get('view_results', False):
+    if st.session_state.last_results is None:
+        st.warning("Nenhuma simulação realizada ainda.")
+    else:
+        st.markdown("### Resultados da Simulação")
+        st.json(st.session_state.last_results)

@@ -1,7 +1,0 @@
-{
-  "population_size": 20,
-  "generations": 10,
-  "crossover_rate": 0.8,
-  "mutation_rate": 0.1,
-  "description": "Configura\u00e7\u00e3o de exemplo para NSGA-II"
-}

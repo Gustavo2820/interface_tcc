@@ -105,7 +105,6 @@ st.markdown("""
 <div class="menu">
     <a href="../app" >Menu</a>
     <a href="./Mapas">Mapas</a>
-    <a href="./Criacao_Mapas">Criação de Mapas</a>
     <a href="./Parâmetros" class="active">Parâmetros</a>
     <a href="./Resultados">Resultados</a>
     <a href="./Documentação">Documentação</a>

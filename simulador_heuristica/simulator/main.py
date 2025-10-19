@@ -32,7 +32,8 @@ if __name__ == "__main__":
         random.seed(args.scenario_seed)
 
     sep = os.path.sep
-    root_path = os.path.dirname(os.path.dirname(os.path.abspath("simulator"))) + sep
+    # Base paths on this file location to avoid dependence on process CWD
+    root_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + sep
 
     structure_map = StructureMap(args.experiment, root_path + "input" + sep + args.experiment + sep + "map.txt")
     structure_map.load_map()
@@ -50,9 +51,22 @@ if __name__ == "__main__":
     individuals = []
     with open(root_path + "input" + sep + args.experiment + sep + "individuals.json", 'r') as json_file:
         data = json.load(json_file)
-        for caracterization in data['caracterizations']:
-            for _ in range(caracterization['amount']):
-                individuals.append(Individual(caracterization, 0, 0))
+        
+        # Handle both formats: direct array or caracterizations object
+        if isinstance(data, list):
+            # Direct array format - each item is an individual
+            for individual_data in data:
+                # Convert color array to separate red, green, blue fields if needed
+                if 'color' in individual_data and isinstance(individual_data['color'], list):
+                    individual_data['red'] = individual_data['color'][0]
+                    individual_data['green'] = individual_data['color'][1]
+                    individual_data['blue'] = individual_data['color'][2]
+                individuals.append(Individual(individual_data, individual_data.get('row', 0), individual_data.get('col', 0)))
+        else:
+            # Expected format with caracterizations
+            for caracterization in data['caracterizations']:
+                for _ in range(caracterization['amount']):
+                    individuals.append(Individual(caracterization, 0, 0))
 
     if args.simulation_seed:
         random.seed(args.simulation_seed)      
@@ -66,7 +80,7 @@ if __name__ == "__main__":
 
     # SIMULATOR
     directory = root_path + "output" + sep + args.experiment
-    scen = Scenario("cult_experiment",True,5,12)
+    scen = Scenario(args.experiment, args.draw, args.scenario_seed or 0, args.simulation_seed or 0)
     simulator = Simulator(scen)
     iterations, qtdDistance = simulator.simulate()
 

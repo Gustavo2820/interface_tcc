@@ -1,7 +1,7 @@
 
-from .mh_ga_nsgaii import Chromosome
-from .sim_ca_scenario import Scenario
-from .sim_ca_simulator import Simulator
+from mh_ga_nsgaii import Chromosome
+from sim_ca_scenario import Scenario
+from sim_ca_simulator import Simulator
 
 from random import choice, randint, sample, seed
 
