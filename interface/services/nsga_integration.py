@@ -126,6 +126,7 @@ class EvacuationProblem(Problem):
         results = np.apply_along_axis(self._evaluate_single, 1, x)
         out["F"] = results
     
+     
     def _evaluate_single(self, gene):
         """
         Avalia uma única solução.
@@ -165,12 +166,12 @@ class EvacuationProblem(Problem):
                 experiment_name, map_file, individuals_file
             )
             
-            # Obtém parâmetros de simulação se disponíveis
+            # Obtém parâmetros de simulação
             scenario_seed = self.simulation_params.get('scenario_seed')
             simulation_seed = self.simulation_params.get('simulation_seed')
             draw_mode = self.simulation_params.get('draw_mode', False)
             
-            # Executa a simulação com parâmetros
+            # Executa a simulação
             result = self.simulator_integration.run_simulator_cli(
                 experiment_name,
                 draw=draw_mode,
@@ -180,22 +181,26 @@ class EvacuationProblem(Problem):
             
             # Lê os resultados
             results = self.simulator_integration.read_results(experiment_name)
-            
-            # Extrai métricas dos objetivos
+            if results.get("error"):
+                print(f"Erro na leitura dos resultados: {results['error']}")
+                return [float('inf'), float('inf')]
+            # Extrai métricas reais
             objectives = self._extract_objectives(results)
-            
+            # Evita problema com todos os valores iguais
+            if objectives[0] == objectives[1]:
+                objectives[1] += 1e-3
             return objectives
+
             
         except Exception as e:
             print(f"Erro na avaliação do cromossomo: {e}")
-            # Retorna valores padrão em caso de erro
             return [float('inf'), float('inf')]
         
         finally:
-            # Limpa arquivos temporários
             import shutil
             if temp_dir.exists():
                 shutil.rmtree(temp_dir, ignore_errors=True)
+
     
     def _decode_gene(self, gene: Any) -> List[tuple]:
         """
@@ -240,18 +245,22 @@ class EvacuationProblem(Problem):
         return '\n'.join(lines)
     
     def _extract_objectives(self, results: Dict) -> List[float]:
-        """
-        Extrai os objetivos dos resultados da simulação.
-        
-        Args:
-            results: Resultados da simulação
+        try:
+            tempo_total = float(results.get("tempo_total", 1e6))  # valor grande se não existir
+            distancia_total = float(results.get("distancia_total", 1e6))
             
-        Returns:
-            Lista com os valores dos objetivos
-        """
-        # Implementação simplificada - retorna tempo e distância
-        # Em uma implementação real, estes valores seriam extraídos dos logs
-        return [100.0, 50.0]  # [tempo, distância]
+            # Protege contra valores inválidos
+            if np.isnan(tempo_total) or np.isinf(tempo_total):
+                tempo_total = 1e6
+            if np.isnan(distancia_total) or np.isinf(distancia_total):
+                distancia_total = 1e6
+            
+            return [tempo_total, distancia_total]
+        except Exception as e:
+            print(f"Erro ao extrair objetivos: {e}")
+            return [1e6, 1e6]
+
+
 
 
 class NSGAIntegration:
