@@ -53,16 +53,24 @@ Thumbs.db
 *.sqlite3
 simulador.db
 
-# Configuration files
+# Configuration files (temporary only)
 temp_*.json
-config_*.json
-*_config.json
+config_*_*.json
+*_config_*.json
+
+# Keep example configs for documentation
+!*example*.json
+!*_example*.json
 
 # Upload directories
 uploads/
 temp_nsga/
 temp_simulation/
 temp_test/
+
+# Examples directory (keep for documentation)
+!examples/
+!examples/**/*.json
 
 # Map files
 *.map

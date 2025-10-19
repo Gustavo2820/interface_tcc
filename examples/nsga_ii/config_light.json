@@ -1,0 +1,7 @@
+{
+  "population_size": 8,
+  "generations": 3,
+  "crossover_rate": 0.8,
+  "mutation_rate": 0.1,
+  "description": "Configuração leve para testes rápidos - apenas 24 simulações"
+}
