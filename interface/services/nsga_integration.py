@@ -93,7 +93,7 @@ class EvacuationProblem(Problem):
     adaptando o problema de evacuação para otimização multiobjetivo.
     """
     
-    def __init__(self, simulator_integration, map_template: str, individuals_template: Dict, door_positions: List[tuple]):
+    def __init__(self, simulator_integration, map_template: str, individuals_template: Dict, door_positions: List[tuple], simulation_params: Dict = None):
         """
         Inicializa o problema de evacuação.
         
@@ -102,11 +102,13 @@ class EvacuationProblem(Problem):
             map_template: Template do mapa base
             individuals_template: Template dos indivíduos base
             door_positions: Lista de posições possíveis para portas
+            simulation_params: Parâmetros de simulação (opcional)
         """
         self.simulator_integration = simulator_integration
         self.map_template = map_template
         self.individuals_template = individuals_template
         self.door_positions = door_positions
+        self.simulation_params = simulation_params or {}
         self.evaluation_count = 0
         
         # Define um problema com 2 objetivos e n variáveis binárias (uma para cada posição de porta)
@@ -163,8 +165,18 @@ class EvacuationProblem(Problem):
                 experiment_name, map_file, individuals_file
             )
             
-            # Executa a simulação
-            result = self.simulator_integration.run_simulator_cli(experiment_name)
+            # Obtém parâmetros de simulação se disponíveis
+            scenario_seed = self.simulation_params.get('scenario_seed')
+            simulation_seed = self.simulation_params.get('simulation_seed')
+            draw_mode = self.simulation_params.get('draw_mode', False)
+            
+            # Executa a simulação com parâmetros
+            result = self.simulator_integration.run_simulator_cli(
+                experiment_name,
+                draw=draw_mode,
+                scenario_seed=scenario_seed,
+                simulation_seed=simulation_seed
+            )
             
             # Lê os resultados
             results = self.simulator_integration.read_results(experiment_name)
@@ -207,18 +219,22 @@ class EvacuationProblem(Problem):
         Gera o conteúdo do mapa com as portas posicionadas.
         
         Args:
-            door_positions: Lista de posições das portas
+            door_positions: Lista de posições das portas a serem ativadas
             
         Returns:
             Conteúdo do mapa como string
         """
-        # Implementação simplificada - substitui '0' por '3' nas posições das portas
         lines = self.map_template.split('\n')
         
+        # Primeiro, desativa todas as portas existentes (converte '2' para '0')
+        for y, line in enumerate(lines):
+            lines[y] = line.replace('2', '0')
+        
+        # Depois, ativa apenas as portas selecionadas (converte '0' para '2' nas posições escolhidas)
         for x, y in door_positions:
             if 0 <= y < len(lines) and 0 <= x < len(lines[y]):
                 line = list(lines[y])
-                line[x] = '3'  # 3 representa porta no formato do simulador
+                line[x] = '2'  # 2 representa porta ativa no formato do simulador
                 lines[y] = ''.join(line)
         
         return '\n'.join(lines)
@@ -260,6 +276,7 @@ class NSGAIntegration:
     def load_configuration(self, config_file: Path) -> bool:
         """
         Carrega configuração do NSGA-II a partir de arquivo.
+        Suporta tanto formato legado quanto formato unificado.
         
         Args:
             config_file: Caminho para o arquivo de configuração
@@ -271,18 +288,85 @@ class NSGAIntegration:
             with open(config_file, 'r') as f:
                 config = json.load(f)
             
-            # Valida configuração necessária
-            required_keys = ['population_size', 'generations', 'crossover_rate', 'mutation_rate']
-            if not all(key in config for key in required_keys):
-                print("Configuração inválida: chaves obrigatórias ausentes")
-                return False
+            # Detecta se é formato unificado ou legado
+            if 'nsga_config' in config:
+                # Formato unificado
+                print("DEBUG: Detectado formato unificado")
+                nsga_config = config['nsga_config']
+                simulation_params = config.get('simulation_params', {})
+                
+                # Valida configuração NSGA-II necessária
+                required_keys = ['population_size', 'generations', 'crossover_rate', 'mutation_rate']
+                if not all(key in nsga_config for key in required_keys):
+                    print("Configuração unificada inválida: chaves NSGA-II obrigatórias ausentes")
+                    return False
+                
+                # Armazena configurações separadamente
+                self.config = nsga_config
+                self.simulation_params = simulation_params
+                self.is_unified_format = True
+                
+            else:
+                # Formato legado (compatibilidade)
+                print("DEBUG: Detectado formato legado")
+                required_keys = ['population_size', 'generations', 'crossover_rate', 'mutation_rate']
+                if not all(key in config for key in required_keys):
+                    print("Configuração legada inválida: chaves obrigatórias ausentes")
+                    return False
+                
+                self.config = config
+                self.simulation_params = {}
+                self.is_unified_format = False
             
-            self.config = config
+            print(f"DEBUG: Configuração carregada - NSGA: {self.config}")
+            print(f"DEBUG: Parâmetros de simulação: {self.simulation_params}")
             return True
             
         except Exception as e:
             print(f"Erro ao carregar configuração: {e}")
             return False
+    
+    def get_simulation_params(self) -> Dict:
+        """
+        Retorna os parâmetros de simulação carregados.
+        
+        Returns:
+            Dicionário com parâmetros de simulação
+        """
+        return getattr(self, 'simulation_params', {})
+    
+    def is_unified_config(self) -> bool:
+        """
+        Verifica se a configuração carregada é do formato unificado.
+        
+        Returns:
+            True se é formato unificado, False se é legado
+        """
+        return getattr(self, 'is_unified_format', False)
+    
+    def extract_door_positions_from_map(self, map_template: str) -> List[tuple]:
+        """
+        Extrai posições das portas existentes no mapa.
+        
+        Args:
+            map_template: Template do mapa como string
+            
+        Returns:
+            Lista de tuplas (x, y) com posições das portas existentes
+        """
+        door_positions = []
+        lines = map_template.strip().split('\n')
+        
+        for y, line in enumerate(lines):
+            for x, char in enumerate(line):
+                # Procura por portas existentes (valor 2 = M_DOOR)
+                if char == '2':
+                    door_positions.append((x, y))
+        
+        print(f"DEBUG: Encontradas {len(door_positions)} portas existentes no mapa")
+        if door_positions:
+            print(f"DEBUG: Posições das portas: {door_positions}")
+        return door_positions
     
     def setup_optimization(
         self, 
@@ -332,7 +416,8 @@ class NSGAIntegration:
                 self.simulator_integration, 
                 map_template, 
                 individuals_template,
-                door_positions
+                door_positions,
+                self.get_simulation_params()
             )
             print("DEBUG: Problem criado com sucesso")
             st.success("Problem criado com sucesso")

@@ -103,70 +103,127 @@ with col1:
     selected_map = st.selectbox("Mapa", options=["(selecione)"] + map_options)
     mapa_nome = selected_map if selected_map != "(selecione)" else None
 
-    # Upload de parâmetros
-    uploaded_params_file = st.file_uploader("Carregar parâmetros (.json)", type=["json"])
-    nsga_config_uploaded_path = None
-    if algorithm == "NSGA-II":
-        nsga_cfg = st.file_uploader("Config NSGA-II (.json)", type=["json"], key="nsga_cfg")
-        if nsga_cfg:
-            try:
-                nsga_dir = Path("uploads")/"nsga_ii"
-                nsga_dir.mkdir(parents=True, exist_ok=True)
-                from datetime import datetime as _dt
-                nsga_cfg_path = nsga_dir / f"config_{_dt.now().strftime('%Y%m%d_%H%M%S')}.json"
-                nsga_cfg_path.write_text(nsga_cfg.read().decode('utf-8'))
-                nsga_config_uploaded_path = nsga_cfg_path
-                # carrega configuração no integrador
-                st.session_state.nsga_integration.load_configuration(nsga_cfg_path)
-                st.success("Configuração NSGA-II carregada.")
-            except Exception as e:
-                st.warning(f"Falha ao salvar/carregar config NSGA-II: {e}")
-    if uploaded_params_file:
+    # Upload de configuração unificada
+    uploaded_config_file = st.file_uploader("Carregar configuração (.json)", type=["json"], 
+                                           help="Arquivo de configuração unificada (recomendado) ou formato legado")
+    config_uploaded_path = None
+    
+    if uploaded_config_file:
         try:
-            loaded_params = json.load(uploaded_params_file)
-            for k,v in loaded_params.items():
-                st.session_state[k] = v
-            st.success("Parâmetros carregados!")
+            config_dir = Path("uploads")/"configs"
+            config_dir.mkdir(parents=True, exist_ok=True)
+            from datetime import datetime as _dt
+            config_path = config_dir / f"config_{_dt.now().strftime('%Y%m%d_%H%M%S')}.json"
+            config_path.write_text(uploaded_config_file.read().decode('utf-8'))
+            config_uploaded_path = config_path
+            
+            # Carrega configuração
+            if algorithm == "NSGA-II":
+                if st.session_state.nsga_integration.load_configuration(config_path):
+                    st.success("Configuração carregada com sucesso!")
+                    if st.session_state.nsga_integration.is_unified_config():
+                        st.info("✅ **Formato unificado detectado** - parâmetros de simulação incluídos!")
+                        sim_params = st.session_state.nsga_integration.get_simulation_params()
+                        if sim_params:
+                            st.json(sim_params)
+                    else:
+                        st.warning("⚠️ **Formato legado detectado** - apenas parâmetros NSGA-II")
+                        st.info("💡 Considere usar o formato unificado para incluir parâmetros de simulação!")
+                else:
+                    st.error("Falha ao carregar configuração")
+            else:
+                # Para outros algoritmos, carrega parâmetros diretamente
+                loaded_config = json.loads(config_path.read_text())
+                for k, v in loaded_config.items():
+                    st.session_state[k] = v
+                st.success("Configuração carregada!")
         except Exception as e:
-            st.error(f"Erro ao carregar parâmetros: {e}")
+            st.error(f"Erro ao carregar configuração: {e}")
 
-    # Parâmetros da simulação
-    with st.expander("Criar/Editar parâmetros"):
-        pop_size = st.number_input("pop_size", value=st.session_state.get("pop_size",10), min_value=1)
-        mut_prob = st.number_input("mut_prob", value=st.session_state.get("mut_prob",0.4), min_value=0.0, max_value=1.0, step=0.01)
-        max_gen = st.number_input("max_gen", value=st.session_state.get("max_gen",300), min_value=1)
-        scenario_seed = st.number_input("Seed do cenário", value=st.session_state.get("scenario_seed",75), min_value=0)
-        simulation_seed = st.number_input("Seed da simulação", value=st.session_state.get("simulation_seed",75), min_value=0)
-
-        if st.button("💾 Salvar parâmetros"):
-            params_dict = dict(pop_size=pop_size, mut_prob=mut_prob, max_gen=max_gen, scenario_seed=scenario_seed, simulation_seed=simulation_seed)
-            Path("temp_simulation").mkdir(exist_ok=True)
-            with open("temp_simulation/parameters.json","w") as f:
-                json.dump(params_dict,f,indent=2)
-            st.success("Parâmetros salvos!")
-
-    # Formulário de criação de configuração NSGA-II
-    if algorithm == "NSGA-II":
-        with st.expander("Criar Configuração NSGA-II"):
-            with st.form("form_nsga_cfg"):
-                population_size = st.number_input("population_size", min_value=2, value=20)
-                generations = st.number_input("generations", min_value=1, value=50)
-                crossover_rate = st.number_input("crossover_rate", min_value=0.0, max_value=1.0, value=0.9, step=0.05)
-                mutation_rate = st.number_input("mutation_rate", min_value=0.0, max_value=1.0, value=0.1, step=0.05)
-                submit_cfg = st.form_submit_button("💾 Salvar configuração NSGA-II")
-            if submit_cfg:
-                nsga_dir = Path("uploads")/"nsga_ii"
-                nsga_dir.mkdir(parents=True, exist_ok=True)
-                cfg = {
-                    "population_size": int(population_size),
-                    "generations": int(generations),
-                    "crossover_rate": float(crossover_rate),
-                    "mutation_rate": float(mutation_rate)
-                }
-                cfg_path = nsga_dir/"generated_config.json"
-                cfg_path.write_text(json.dumps(cfg, indent=2))
-                st.session_state.nsga_integration.load_configuration(cfg_path)
-                st.success(f"Configuração NSGA-II salva em {cfg_path}")
+    # Formulário unificado de criação de configuração
+    with st.expander("⚙️ Criar/Editar Configuração Unificada"):
+        st.markdown("**💡 Formato Unificado**: Combina parâmetros do algoritmo e de simulação em um único arquivo")
+        
+        with st.form("form_unified_config"):
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.markdown("### 🧬 Parâmetros do Algoritmo")
+                if algorithm == "NSGA-II":
+                    population_size = st.number_input("Tamanho da população", min_value=2, value=20, help="Número de indivíduos na população")
+                    generations = st.number_input("Número de gerações", min_value=1, value=10, help="Número de gerações para evolução")
+                    crossover_rate = st.number_input("Taxa de crossover", min_value=0.0, max_value=1.0, value=0.8, step=0.05, help="Probabilidade de crossover")
+                    mutation_rate = st.number_input("Taxa de mutação", min_value=0.0, max_value=1.0, value=0.1, step=0.05, help="Probabilidade de mutação")
+                else:
+                    # Parâmetros para outros algoritmos
+                    pop_size = st.number_input("Tamanho da população", min_value=1, value=10, help="Número de indivíduos")
+                    mut_prob = st.number_input("Probabilidade de mutação", min_value=0.0, max_value=1.0, value=0.4, step=0.01, help="Taxa de mutação")
+                    max_gen = st.number_input("Máximo de gerações", min_value=1, value=300, help="Número máximo de gerações")
+            
+            with col2:
+                st.markdown("### 🎯 Parâmetros de Simulação")
+                scenario_seed = st.number_input("Seed do cenário", min_value=0, value=42, help="Seed para geração do cenário")
+                simulation_seed = st.number_input("Seed da simulação", min_value=0, value=123, help="Seed para execução da simulação")
+                draw_mode = st.checkbox("Gerar imagens", value=True, help="Gerar imagens de saída da simulação")
+                verbose = st.checkbox("Modo verboso", value=False, help="Exibir informações detalhadas durante execução")
+            
+            description = st.text_input("Descrição da configuração", value=f"Configuração para {algorithm}", help="Descrição opcional da configuração")
+            
+            submit_config = st.form_submit_button("💾 Salvar Configuração Unificada")
+        
+        if submit_config:
+            try:
+                config_dir = Path("uploads")/"configs"
+                config_dir.mkdir(parents=True, exist_ok=True)
+                
+                if algorithm == "NSGA-II":
+                    # Formato unificado para NSGA-II
+                    unified_config = {
+                        "nsga_config": {
+                            "population_size": int(population_size),
+                            "generations": int(generations),
+                            "crossover_rate": float(crossover_rate),
+                            "mutation_rate": float(mutation_rate)
+                        },
+                        "simulation_params": {
+                            "scenario_seed": int(scenario_seed),
+                            "simulation_seed": int(simulation_seed),
+                            "draw_mode": bool(draw_mode),
+                            "verbose": bool(verbose)
+                        },
+                        "description": description
+                    }
+                else:
+                    # Formato unificado para outros algoritmos
+                    unified_config = {
+                        "algorithm_params": {
+                            "pop_size": int(pop_size),
+                            "mut_prob": float(mut_prob),
+                            "max_gen": int(max_gen)
+                        },
+                        "simulation_params": {
+                            "scenario_seed": int(scenario_seed),
+                            "simulation_seed": int(simulation_seed),
+                            "draw_mode": bool(draw_mode),
+                            "verbose": bool(verbose)
+                        },
+                        "description": description
+                    }
+                
+                # Salva configuração
+                from datetime import datetime as _dt
+                config_path = config_dir / f"unified_config_{algorithm.lower().replace(' ', '_')}_{_dt.now().strftime('%Y%m%d_%H%M%S')}.json"
+                config_path.write_text(json.dumps(unified_config, indent=2))
+                
+                # Carrega configuração se for NSGA-II
+                if algorithm == "NSGA-II":
+                    st.session_state.nsga_integration.load_configuration(config_path)
+                
+                st.success(f"✅ Configuração unificada salva em: `{config_path}`")
+                st.json(unified_config)
+                
+            except Exception as e:
+                st.error(f"Erro ao salvar configuração: {e}")
 
     # Upload ou criação de indivíduos (editor interativo)
     uploaded_individuals_file = st.file_uploader("Arquivo de indivíduos (.json)", type=["json"])
@@ -308,8 +365,17 @@ if st.session_state.run_sim:
                     # exige configuração NSGA-II carregada
                     if not getattr(st.session_state.nsga_integration, 'config', None):
                         st.error("Configuração NSGA-II não encontrada no session_state")
-                        raise RuntimeError("Configuração do NSGA-II não carregada. Envie o arquivo de configuração acima.")
+                        raise RuntimeError("Configuração do NSGA-II não carregada. Crie ou carregue uma configuração acima.")
                     st.info(f"Configuração NSGA-II encontrada: {st.session_state.nsga_integration.config}")
+                    
+                    # Obtém parâmetros de simulação da configuração unificada
+                    sim_params = st.session_state.nsga_integration.get_simulation_params()
+                    scenario_seed = sim_params.get('scenario_seed', 42)
+                    simulation_seed = sim_params.get('simulation_seed', 123)
+                    draw_mode = sim_params.get('draw_mode', True)
+                    
+                    st.info(f"Parâmetros de simulação: scenario_seed={scenario_seed}, simulation_seed={simulation_seed}, draw_mode={draw_mode}")
+                    
                     # Prepara templates para NSGA-II
                     st.info("Preparando templates para NSGA-II...")
                     map_template = Path(simulator_input_dir / "map.txt").read_text()
@@ -319,9 +385,14 @@ if st.session_state.run_sim:
                     
                     st.info("Chamando setup_optimization...")
                     try:
+                        # Extrai posições das portas do mapa
+                        door_positions = st.session_state.nsga_integration.extract_door_positions_from_map(map_template)
+                        st.info(f"Posições de portas extraídas: {len(door_positions)} posições")
+                        
                         ok = st.session_state.nsga_integration.setup_optimization(
                             map_template=map_template,
-                            individuals_template=individuals_template
+                            individuals_template=individuals_template,
+                            door_positions=door_positions
                         )
                         st.info(f"setup_optimization retornou: {ok}")
                     except Exception as e:
@@ -345,11 +416,17 @@ if st.session_state.run_sim:
                     # marca como sucesso
                     completed_process = type("Proc", (), {"returncode": 0, "stdout": "NSGA-II concluído", "stderr": ""})()
                 else:
+                    # Para outros algoritmos, usa parâmetros da configuração unificada ou padrões
+                    sim_params = st.session_state.get('simulation_params', {})
+                    scenario_seed = sim_params.get('scenario_seed', st.session_state.get('scenario_seed', 75))
+                    simulation_seed = sim_params.get('simulation_seed', st.session_state.get('simulation_seed', 75))
+                    draw_mode = sim_params.get('draw_mode', True)
+                    
                     completed_process = st.session_state.simulator_integration.run_simulator_cli(
-                    experiment_name=simulation_name,
-                    draw=True,
-                    scenario_seed=scenario_seed,
-                    simulation_seed=simulation_seed
+                        experiment_name=simulation_name,
+                        draw=draw_mode,
+                        scenario_seed=scenario_seed,
+                        simulation_seed=simulation_seed
                     )
 
                 st.text("STDOUT do simulador:")

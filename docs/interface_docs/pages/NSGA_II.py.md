@@ -198,59 +198,58 @@ uploads/
 
 ## Formatos de Arquivo Suportados
 
-### 1. JSON (.json)
+### 1. Formato Unificado (Recomendado) ⭐
 ```json
 {
-  "populacao": 100,
-  "geracoes": 50,
-  "crossover_rate": 0.8,
-  "mutation_rate": 0.1,
-  "objectives": ["tempo_evacuacao", "eficiencia"],
-  "constraints": ["capacidade_maxima"],
-  "elitismo": true,
-  "crowding_distance": true
+  "nsga_config": {
+    "population_size": 20,
+    "generations": 10,
+    "crossover_rate": 0.8,
+    "mutation_rate": 0.1
+  },
+  "simulation_params": {
+    "scenario_seed": 42,
+    "simulation_seed": 123,
+    "draw_mode": true,
+    "verbose": true
+  },
+  "description": "Configuração unificada para NSGA-II"
 }
 ```
 
-### 2. CSV (.csv)
-```csv
-parametro,valor
-populacao,100
-geracoes,50
-crossover_rate,0.8
-mutation_rate,0.1
-objectives,"tempo_evacuacao,eficiencia"
-constraints,"capacidade_maxima"
-```
-
-### 3. TXT (.txt)
-```
-populacao=100
-geracoes=50
-crossover_rate=0.8
-mutation_rate=0.1
-objectives=tempo_evacuacao,eficiencia
-constraints=capacidade_maxima
+### 2. Formato Legado (Compatibilidade)
+```json
+{
+  "population_size": 20,
+  "generations": 10,
+  "crossover_rate": 0.8,
+  "mutation_rate": 0.1,
+  "description": "Configuração legada"
+}
 ```
 
 ## Parâmetros Específicos do NSGA-II
 
-### Parâmetros Básicos
-- **populacao**: Tamanho da população
-- **geracoes**: Número de gerações
+### Formato Unificado
+
+#### NSGA-II (`nsga_config`)
+- **population_size**: Tamanho da população (5-100)
+- **generations**: Número de gerações (1-100)
+- **crossover_rate**: Taxa de crossover (0.0-1.0)
+- **mutation_rate**: Taxa de mutação (0.0-1.0)
+
+#### Simulação (`simulation_params`)
+- **scenario_seed**: Seed para geração do cenário (opcional)
+- **simulation_seed**: Seed para execução da simulação (opcional)
+- **draw_mode**: Gerar imagens de saída (true/false)
+- **verbose**: Modo verboso (true/false)
+
+### Formato Legado (Compatibilidade)
+- **population_size**: Tamanho da população
+- **generations**: Número de gerações
 - **crossover_rate**: Taxa de crossover
 - **mutation_rate**: Taxa de mutação
-
-### Parâmetros Multi-objetivo
-- **objectives**: Lista de objetivos a serem otimizados
-- **constraints**: Restrições do problema
-- **crowding_distance**: Usar distância de aglomeração
-- **elitismo**: Manter melhores indivíduos
-
-### Parâmetros de Parada
-- **max_evaluations**: Máximo de avaliações
-- **convergence_threshold**: Limiar de convergência
-- **time_limit**: Limite de tempo
+- **description**: Descrição opcional da configuração
 
 ## Dependências
 
