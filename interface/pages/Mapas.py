@@ -47,8 +47,11 @@ st.markdown("""
     .titulo { text-align: center; font-size: 36px; font-weight: 700; margin-bottom: 10px; }
     .linha { width: 200px; height: 2px; background-color: #444; margin: 0 auto 50px auto; }
     .mapa-container { text-align: center; }
+    /* Cards e miniaturas normalizadas, mantendo proporção */
+    .mapa-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px; }
+    .mapa-card { width: 100%; max-width: 520px; margin: 0 auto 20px; text-align: center; background:#fff; border:1px solid #e8e8e8; border-radius:12px; padding:12px; box-shadow:0 2px 8px rgba(0,0,0,0.04); }
     .mapa-legenda { font-size: 16px; font-weight: 500; margin-top: 8px; color: #333; }
-    .mapa-link img { border-radius: 10px; transition: transform 0.2s ease; cursor: pointer; width:100%; height:auto; }
+    .mapa-link img { border-radius: 10px; transition: transform 0.2s ease; cursor: pointer; width:100%; height:auto; max-height: 360px; }
     .mapa-link img:hover { transform: scale(1.03); }
     </style>
 """, unsafe_allow_html=True)
@@ -58,6 +61,7 @@ st.markdown("""
 <div class="menu">
     <a href="../app" >Menu</a>
     <a href="./Mapas" class="active" >Mapas</a>
+    <a href="./Criacao_Mapas">Criação de Mapas</a>
     <a href="./Parâmetros">Parâmetros</a>
     <a href="./Resultados">Resultados</a>
     <a href="./Documentação">Documentação</a>
@@ -72,42 +76,50 @@ st.markdown('<div class="linha"></div>', unsafe_allow_html=True)
 mapas_dir = Path("mapas")
 mapas_dir.mkdir(exist_ok=True)
 
+# Botão para criar novo mapa
+col1, col2 = st.columns([1, 4])
+with col1:
+    if st.button("🎨 Criar Novo Mapa", help="Abre o editor de mapas"):
+        st.markdown('<script>window.location.href = "./Criacao_Mapas";</script>', unsafe_allow_html=True)
+
+with col2:
+    st.write("ou faça upload de um mapa existente:")
+
 uploaded = st.file_uploader("Adicionar novo mapa (.png)", type=["png"])
 if uploaded:
     dest = mapas_dir / uploaded.name
     with open(dest, "wb") as f:
         shutil.copyfileobj(uploaded, f)
     st.success(f"Mapa '{uploaded.name}' adicionado com sucesso!")
-    st.experimental_rerun()  # recarrega para mostrar o novo mapa imediatamente
+    st.rerun()  # recarrega para mostrar o novo mapa imediatamente
 
 # ================= EXIBIÇÃO DE MAPAS EXISTENTES =================
 mapas = sorted(mapas_dir.glob("*.png"))
 if mapas:
-    cols = st.columns(3)
-    for i, mapa in enumerate(mapas):
-        with cols[i % 3]:
-            # lê a imagem e converte para base64
-            try:
-                with open(mapa, "rb") as f:
-                    data = f.read()
-                img_b64 = base64.b64encode(data).decode("utf-8")
-                # monta link para a página Detalhes usando o roteamento do Streamlit
-                mapa_nome = mapa.stem
-                mapa_nome_url = urllib.parse.quote_plus(mapa_nome)  # escapa espaços e caracteres
-                href = f"/?page=Detalhes&mapa={mapa_nome_url}"
+    st.markdown('<div class="mapa-grid">', unsafe_allow_html=True)
+    for mapa in mapas:
+        try:
+            with open(mapa, "rb") as f:
+                data = f.read()
+            img_b64 = base64.b64encode(data).decode("utf-8")
+            mapa_nome = mapa.stem
+            mapa_nome_url = urllib.parse.quote_plus(mapa_nome)
+            href = f"/?page=Detalhes&mapa={mapa_nome_url}"
 
-                # insere HTML com data-uri + link correto
-                st.markdown(
-                    f'''
-                    <a class="mapa-link" href="{href}">
-                      <img src="data:image/png;base64,{img_b64}" alt="{mapa_nome}" />
-                    </a>
-                    <div class="mapa-legenda">{mapa_nome}</div>
-                    ''',
-                    unsafe_allow_html=True
-                )
-            except Exception as e:
-                st.error(f"Erro ao carregar {mapa.name}: {e}")
+            st.markdown(
+                f'''
+                <div class="mapa-card">
+                  <a class="mapa-link" href="{href}">
+                    <img src="data:image/png;base64,{img_b64}" alt="{mapa_nome}" />
+                  </a>
+                  <div class="mapa-legenda">{mapa_nome}</div>
+                </div>
+                ''',
+                unsafe_allow_html=True
+            )
+        except Exception as e:
+            st.error(f"Erro ao carregar {mapa.name}: {e}")
+    st.markdown('</div>', unsafe_allow_html=True)
 else:
     st.info("Nenhum mapa adicionado ainda. Use o botão acima para adicionar um.")
 

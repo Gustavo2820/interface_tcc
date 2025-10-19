@@ -1,9 +1,37 @@
 
-from mh_ga_nsgaii import ChromosomeFactory, Chromosome
-from sim_ca_scenario import Scenario
-from sim_ca_simulator import Simulator
+from .mh_ga_nsgaii import Chromosome
+from .sim_ca_scenario import Scenario
+from .sim_ca_simulator import Simulator
 
 from random import choice, randint, sample, seed
+
+class ChromosomeFactory:
+    """Abstract class to generate chromossomes."""
+
+    def __init__(self, instance):
+        self.instance = instance
+
+    def decode(self, gene):
+        """Decode a gene into a solution."""
+        raise NotImplementedError
+
+    def new(self):
+        """Create a random solution."""
+        raise NotImplementedError
+
+    def crossover(self, parent_a, parent_b):
+        """Generate the offspring for two genes."""
+        raise NotImplementedError
+
+    def mutate(self, gene):
+        """Change the structure of a gene."""
+        raise NotImplementedError
+
+    def build(self, generation, gene):
+        """Create a chromosome based on a gene."""
+        solution = self.decode(gene)
+        obj = [f(solution, self.instance) for f in self.objective_functions]
+        return Chromosome(generation, gene, obj)
 
 class Gene:
 

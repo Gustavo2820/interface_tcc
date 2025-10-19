@@ -5,6 +5,13 @@ Este módulo exibe uma tabela com informações sobre simulações executadas,
 incluindo ID, nome, mapa, algoritmo e status de execução.
 """
 import streamlit as st
+import sys
+from pathlib import Path
+
+# Adiciona o caminho dos serviços ao sys.path
+sys.path.append(str(Path(__file__).parent.parent))
+
+from services.simulator_integration import DatabaseIntegration
 
 # Configuração da página
 st.set_page_config(page_title="Resultados", layout="wide")
@@ -110,47 +117,80 @@ st.markdown("""
 <div class="menu">
     <a href="../app" >Menu</a>
     <a href="./Mapas">Mapas</a>
+    <a href="./Criacao_Mapas">Criação de Mapas</a>
     <a href="./Parâmetros">Parâmetros</a>
     <a href="./Resultados" class="active">Resultados</a>
     <a href="./Documentação">Documentação</a>
 </div>
 """, unsafe_allow_html=True)
 
+# ================= INICIALIZAÇÃO DO BANCO =================
+if 'db_integration' not in st.session_state:
+    st.session_state.db_integration = DatabaseIntegration()
+
 # ================= BOTÃO PESQUISAR =================
-st.markdown('<a class="btn-pesquisar">Pesquisar</a>', unsafe_allow_html=True)
+col1, col2, col3 = st.columns([1, 1, 1])
+with col2:
+    if st.button("🔄 Atualizar Lista", key="refresh_button"):
+        st.rerun()
+
+# ================= CARREGA DADOS DO BANCO =================
+simulations = st.session_state.db_integration.get_simulations()
 
 # ================= TABELA =================
-st.markdown("""
-<div class="tabela-container">
-<table class="tabela">
-    <thead>
-        <tr>
-            <th>ID</th>
-            <th>NOME</th>
-            <th>MAPA</th>
-            <th>ALGORITMO</th>
-            <th>SIMULADO</th>
-        </tr>
-    </thead>
-    <tbody>
-        <tr>
-            <td>1</td>
-            <td>capacidade_maxima</td>
-            <td>Igreja</td>
-            <td>NSGA-II</td>
-            <td>SIM</td>
-        </tr>
-        <tr>
-            <td>2</td>
-            <td>fluxo_otimizado</td>
-            <td>Shopping</td>
-            <td>Força Bruta</td>
-            <td>NÃO</td>
-        </tr>
-    </tbody>
-</table>
-</div>
-""", unsafe_allow_html=True)
+if simulations:
+    st.markdown("""
+    <div class="tabela-container">
+    <table class="tabela">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>NOME</th>
+                <th>MAPA</th>
+                <th>ALGORITMO</th>
+                <th>SIMULADO</th>
+            </tr>
+        </thead>
+        <tbody>
+    """, unsafe_allow_html=True)
+    
+    for sim in simulations:
+        st.markdown(f"""
+            <tr>
+                <td>{sim['id']}</td>
+                <td>{sim['nome']}</td>
+                <td>{sim['mapa']}</td>
+                <td>{sim['algoritmo']}</td>
+                <td>{sim['simulado']}</td>
+            </tr>
+        """, unsafe_allow_html=True)
+    
+    st.markdown("""
+        </tbody>
+    </table>
+    </div>
+    """, unsafe_allow_html=True)
+else:
+    st.markdown("""
+    <div class="tabela-container">
+    <table class="tabela">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>NOME</th>
+                <th>MAPA</th>
+                <th>ALGORITMO</th>
+                <th>SIMULADO</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td colspan="5" style="text-align: center; color: #888;">Nenhuma simulação encontrada</td>
+            </tr>
+        </tbody>
+    </table>
+    </div>
+    """, unsafe_allow_html=True)
 
 # Evita que Streamlit coloque rodapé padrão
 st.stop()
