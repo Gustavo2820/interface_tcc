@@ -1,4 +1,10 @@
 # pages/Parâmetros.py
+"""
+Página hub para configuração de algoritmos de otimização.
+
+Este módulo serve como ponto central de navegação para diferentes
+algoritmos de otimização (Algoritmo Genético, NSGA-II, Força Bruta).
+"""
 import streamlit as st
 
 # Configuração da página

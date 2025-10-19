@@ -1,4 +1,10 @@
 # pages/Mapas.py
+"""
+Página de gerenciamento e visualização de mapas de evacuação.
+
+Este módulo permite aos usuários fazer upload de novos mapas, visualizar
+mapas existentes e navegar para páginas de detalhes específicos.
+"""
 import streamlit as st
 from pathlib import Path
 import shutil

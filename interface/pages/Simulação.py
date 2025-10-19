@@ -1,4 +1,10 @@
 # pages/simulacao.py
+"""
+Interface para configuração de simulações de evacuação.
+
+Este módulo permite aos usuários configurar parâmetros específicos de simulação,
+visualizar o mapa selecionado e iniciar a execução de simulações.
+"""
 import streamlit as st
 from pathlib import Path
 from PIL import Image

@@ -1,3 +1,9 @@
+"""
+Interface para visualização de resultados de simulações.
+
+Este módulo exibe uma tabela com informações sobre simulações executadas,
+incluindo ID, nome, mapa, algoritmo e status de execução.
+"""
 import streamlit as st
 
 # Configuração da página

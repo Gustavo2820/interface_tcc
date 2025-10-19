@@ -1,4 +1,10 @@
 # pages/NSGA_II.py
+"""
+Interface para configuração do algoritmo NSGA-II.
+
+Este módulo permite aos usuários fazer upload de arquivos de configuração
+para execução do algoritmo NSGA-II (Non-dominated Sorting Genetic Algorithm II).
+"""
 import streamlit as st
 from pathlib import Path
 

@@ -1,4 +1,10 @@
 # pages/Forca_Bruta.py
+"""
+Interface para configuração do método Força Bruta.
+
+Este módulo permite aos usuários fazer upload de arquivos de configuração
+para execução do algoritmo de busca exaustiva (Força Bruta).
+"""
 import streamlit as st
 from pathlib import Path
 

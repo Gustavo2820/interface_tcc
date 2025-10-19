@@ -1,4 +1,10 @@
 # pages/Detalhes.py
+"""
+Interface para visualização detalhada de mapas específicos.
+
+Este módulo exibe a imagem do mapa, informações sobre simulações relacionadas
+e botões de navegação para outras funcionalidades.
+"""
 import streamlit as st
 import pandas as pd
 from pathlib import Path

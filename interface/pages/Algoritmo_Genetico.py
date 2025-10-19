@@ -1,4 +1,10 @@
 # pages/Algoritmo_Genetico.py
+"""
+Interface para configuração do Algoritmo Genético.
+
+Este módulo permite aos usuários fazer upload de arquivos de configuração
+para execução do algoritmo genético de otimização.
+"""
 import streamlit as st
 from pathlib import Path
 

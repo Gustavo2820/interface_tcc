@@ -1,4 +1,10 @@
 # app.py
+"""
+Aplicação principal do sistema de simulação de evacuação.
+
+Este módulo define o ponto de entrada da aplicação Streamlit, configurando
+o layout geral, estilos CSS e menu de navegação da interface.
+"""
 import streamlit as st
 
 # ================= CONFIGURAÇÕES GERAIS =================
