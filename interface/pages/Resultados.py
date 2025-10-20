@@ -11,6 +11,9 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).parent.parent))
 
 from services.simulator_integration import DatabaseIntegration, SimulatorIntegration
+from typing import List
+import matplotlib.pyplot as _plt
+import matplotlib.colors as _colors
 
 # ================= CONFIGURAÇÃO DA PÁGINA =================
 st.set_page_config(page_title="Resultados", layout="wide")
@@ -273,13 +276,46 @@ if selected_name:
 
         if not shown_metric:
             if metrics_files:
-                st.markdown("#### Métricas (texto)")
+                # Try to parse JSON metrics and display them as readable metrics; fallback to raw text
+                displayed = False
                 for mf in metrics_files:
                     try:
                         with open(mf, 'r') as f:
-                            st.text(f"{mf.name}:\n" + f.read())
+                            data = json.load(f)
+                        # prefer canonical keys if present
+                        t = data.get('tempo_total') or data.get('iterations') or data.get('total_time')
+                        d = data.get('distancia_total') or data.get('distance') or data.get('total_distance')
+                        if t is not None or d is not None:
+                            col1, col2 = st.columns(2)
+                            with col1:
+                                try:
+                                    st.metric(label='Tempo total', value=str(round(float(t), 3)) if t is not None else '—')
+                                except Exception:
+                                    st.markdown(f"**Tempo total:** {t}")
+                            with col2:
+                                try:
+                                    st.metric(label='Distância total', value=str(round(float(d), 3)) if d is not None else '—')
+                                except Exception:
+                                    st.markdown(f"**Distância total:** {d}")
+                            displayed = True
+                            # also offer a collapsible view of the full JSON
+                            with st.expander(f"Detalhes — {mf.name}"):
+                                st.json(data)
+                            break
+                        else:
+                            # show the JSON in an expander if we couldn't find keys
+                            with st.expander(f"Métrica (raw) — {mf.name}"):
+                                st.json(data)
+                            displayed = True
                     except Exception:
-                        continue
+                        try:
+                            with open(mf, 'r') as f:
+                                st.text(f"{mf.name}:\n" + f.read())
+                                displayed = True
+                        except Exception:
+                            continue
+                if not displayed:
+                    st.info("Nenhuma métrica legível encontrada nos arquivos de métrica.")
             else:
                 st.info("Nenhuma métrica encontrada.")
 
@@ -327,17 +363,131 @@ if selected_name:
                         options = [f"gen {it.get('generation',0)} - obj {it.get('objectives',[None,None])}" for it in data_pf]
                         idx_sel = st.selectbox("Escolha uma solução da frente de Pareto", options=list(range(len(options))), format_func=lambda i: options[i])
                         sol = data_pf[idx_sel]
-                        st.markdown("#### Objetivos")
-                        st.json({"objectives": sol.get("objectives"), "rank": sol.get("rank"), "crowding_distance": sol.get("distance")})
-                        gene = sol.get("gene")
-                        if gene:
-                            st.markdown("#### Portas (saídas) otimizadas")
-                            try:
-                                # lista de pares (x,y)
-                                if isinstance(gene, list):
-                                    st.code(str(gene))
-                            except Exception:
-                                pass
+                        # attempt to load map layout from input folder for this simulation
+                        map_layout = None
+                        try:
+                            map_path = Path('simulador_heuristica') / 'input' / selected_name / 'map.txt'
+                            if map_path.exists():
+                                txt = map_path.read_text().splitlines()
+                                # convert to list of lists of chars
+                                map_layout = [list(line.rstrip('\n')) for line in txt]
+                        except Exception:
+                            map_layout = None
+
+                        def display_solution_streamlit(solution: dict, map_layout: List[List[str]] = None):
+                            # Section container to keep each solution visually separated
+                            with st.container():
+                                st.markdown(f"### Solução {solution.get('solution_id')}")
+
+                                # Objectives
+                                objs = solution.get('objectives') or []
+                                t_label = 'tempo_total'
+                                d_label = 'distancia_total'
+                                t_val = objs[0] if len(objs) > 0 else None
+                                d_val = objs[1] if len(objs) > 1 else None
+
+                                # Use Streamlit metrics for a clean, intuitive display
+                                cols = st.columns([1,1,2])
+                                with cols[0]:
+                                    try:
+                                        st.metric(label=t_label.replace('_',' ').title(), value=str(round(float(t_val),3)) if t_val is not None else '—')
+                                    except Exception:
+                                        st.markdown(f"**{t_label.replace('_',' ').title()}**: {t_val}")
+                                with cols[1]:
+                                    try:
+                                        st.metric(label=d_label.replace('_',' ').title(), value=str(round(float(d_val),3)) if d_val is not None else '—')
+                                    except Exception:
+                                        st.markdown(f"**{d_label.replace('_',' ').title()}**: {d_val}")
+                                with cols[2]:
+                                    st.markdown('**Gene**')
+                                    gene = solution.get('gene') or []
+                                    if isinstance(gene, list):
+                                        # compact representation, wrap lines for long genes
+                                        try:
+                                            symbols = ['✓' if int(x) else '✗' for x in gene]
+                                            # split into rows of 40 for readability
+                                            row_len = 40
+                                            rows = [''.join(symbols[i:i+row_len]) for i in range(0, len(symbols), row_len)]
+                                            for r in rows:
+                                                st.code(r)
+                                        except Exception:
+                                            st.code(str(gene))
+                                        st.markdown(f"**Num portas:** {int(solution.get('num_doors', sum(gene) if gene else 0))}")
+                                    else:
+                                        st.write(gene)
+
+                                # Door positions
+                                dp = solution.get('door_positions') or []
+                                if dp:
+                                    st.markdown('**Posições de portas**')
+                                    try:
+                                        # Render a clearer table with pandas dataframe and fixed height
+                                        import pandas as _pd
+                                        rows = []
+                                        for i,p in enumerate(dp):
+                                            rows.append({'#': i+1, 'x': int(p[0]), 'y': int(p[1])})
+                                        df = _pd.DataFrame(rows)
+                                        st.dataframe(df, height=180)
+                                    except Exception:
+                                        st.write(dp)
+
+                                # Mini-map if layout provided — make it larger and proportional but capped
+                                if map_layout is not None:
+                                    st.markdown('**Mini-mapa (portas destacadas)**')
+                                    try:
+                                        grid_h = len(map_layout)
+                                        grid_w = len(map_layout[0]) if grid_h>0 else 0
+                                        import numpy as _np
+                                        arr = _np.zeros((grid_h, grid_w), dtype=int)
+                                        # fill base: 0 empty, 1 wall, 2 door
+                                        for y,row in enumerate(map_layout):
+                                            for x,ch in enumerate(row):
+                                                if ch in ('1','|','#'):
+                                                    arr[y,x] = 1
+                                                elif ch in ('2',) or (isinstance(ch, str) and ch.upper()=='P'):
+                                                    arr[y,x] = 2
+                                                else:
+                                                    arr[y,x] = 0
+                                        # mark selected doors from solution
+                                        for p in dp:
+                                            try:
+                                                x = int(p[0]); y = int(p[1])
+                                                if 0 <= y < arr.shape[0] and 0 <= x < arr.shape[1]:
+                                                    arr[y,x] = 3
+                                            except Exception:
+                                                continue
+
+                                        # Larger target cell size for readability, but cap overall image
+                                        target_cell_px = 22
+                                        max_total_px = 1400
+                                        est_w_px = grid_w * target_cell_px
+                                        est_h_px = grid_h * target_cell_px
+                                        scale = min(1.0, max_total_px / max(est_w_px, est_h_px, 1))
+                                        cell_px = int(max(8, target_cell_px * scale))
+
+                                        dpi = 100
+                                        fig_w = max(4, min(14, (grid_w * cell_px) / dpi))
+                                        fig_h = max(4, min(14, (grid_h * cell_px) / dpi))
+
+                                        cmap = _colors.ListedColormap(['#ffffff','#000000','#ff5555','#00cc66'])
+                                        bounds=[0,1,2,3,4]
+                                        norm = _colors.BoundaryNorm(bounds, cmap.N)
+                                        fig, ax = _plt.subplots(figsize=(fig_w, fig_h), dpi=dpi)
+                                        ax.imshow(arr, cmap=cmap, norm=norm, interpolation='nearest')
+                                        ax.set_xticks([]); ax.set_yticks([])
+                                        ax.set_title('Mapa simplificado', fontsize=12)
+
+                                        import io
+                                        buf = io.BytesIO()
+                                        fig.tight_layout(pad=0.5)
+                                        fig.savefig(buf, format='png', bbox_inches='tight')
+                                        _plt.close(fig)
+                                        buf.seek(0)
+                                        st.image(buf, use_column_width=True)
+                                    except Exception:
+                                        st.text('Não foi possível desenhar o mini-mapa.')
+
+                        display_solution_streamlit(sol, map_layout)
                     else:
                         st.info("Nenhum resultado de NSGA-II encontrado no arquivo.")
                 else:

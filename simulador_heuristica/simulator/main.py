@@ -6,6 +6,15 @@ import json
 import pstats
 import random
 import os
+import logging
+from pathlib import Path
+
+logger = logging.getLogger('simulator')
+logger.setLevel(logging.DEBUG)
+if not logger.handlers:
+    ch = logging.StreamHandler()
+    ch.setFormatter(logging.Formatter('%(asctime)s %(levelname)s %(name)s: %(message)s'))
+    logger.addHandler(ch)
 
 from .crowd_map import CrowdMap
 from .individual import Individual
@@ -84,7 +93,25 @@ if __name__ == "__main__":
     simulator = Simulator(scen)
     iterations, qtdDistance = simulator.simulate()
 
-    print("qtd iteracoes " + str(iterations))
-    print("qtd distancia " + str(qtdDistance))
+    logger.info("qtd iteracoes %s", iterations)
+    logger.info("qtd distancia %s", qtdDistance)
+    # Persistir métricas em output/<experiment>/metrics.json para integrações
+    try:
+        metrics = {
+            "tempo_total": float(iterations),
+            "distancia_total": float(qtdDistance),
+            "algorithm": "simulator",
+            "scenario_seed": int(args.scenario_seed or 0),
+            "simulation_seed": int(args.simulation_seed or 0)
+        }
+        out_dir = Path(directory)
+        out_dir.mkdir(parents=True, exist_ok=True)
+        metrics_path = out_dir / "metrics.json"
+        tmp = out_dir / "metrics.json.tmp"
+        tmp.write_text(json.dumps(metrics, indent=2))
+        tmp.replace(metrics_path)
+        logger.debug("metrics.json written to %s", str(metrics_path))
+    except Exception as e:
+        logger.exception("failed to write metrics.json")
     # p.disable()
     # pstats.Stats(p).sort_stats('cumulative').print_stats(30)

@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import List, Dict, Any, Optional
 import numpy as np
 import streamlit as st
+from .logger import default_log as logger
 
 # Adiciona o caminho do simulador ao sys.path para importar módulos
 # Usa caminho absoluto baseado na raiz do projeto (duas pastas acima de `services`)
@@ -123,7 +124,44 @@ class EvacuationProblem(Problem):
             x: Matriz de soluções (pop_size x n_var)
             out: Dicionário de saída onde 'F' contém os objetivos
         """
-        results = np.apply_along_axis(self._evaluate_single, 1, x)
+        # Evaluate each individual and ensure returned array is numeric and finite.
+        raw = np.apply_along_axis(self._evaluate_single, 1, x)
+
+        try:
+            results = np.asarray(raw, dtype=float)
+        except Exception as e:
+            logger.exception("Failed to convert evaluation results to array")
+            # do not invent values; fail safe by assigning large penalty but log as ERROR
+            results = np.full((len(x), 2), 1e6, dtype=float)
+
+        # Normalize shape to (pop_size, 2)
+        if results.ndim == 1 and results.size == 2:
+            results = np.tile(results, (len(x), 1))
+        elif results.ndim == 1 and results.size != 2:
+            # Unexpected shape, set penalties
+            print(f"DEBUG: Unexpected evaluation shape {results.shape}, applying penalties")
+            results = np.full((len(x), 2), 1e6, dtype=float)
+        elif results.ndim == 2 and results.shape[1] != 2:
+            # If more/less objectives returned, try to truncate or pad
+            print(f"DEBUG: Evaluation returned {results.shape[1]} objectives per individual; adjusting to 2")
+            if results.shape[1] > 2:
+                results = results[:, :2]
+            else:
+                # pad with penalty
+                pad = np.full((results.shape[0], 2 - results.shape[1]), 1e6, dtype=float)
+                results = np.hstack([results, pad])
+
+        # Sanitize non-finite values
+        nonfinite_mask = ~np.isfinite(results)
+        if nonfinite_mask.any():
+            logger.warning("Non-finite objective values detected; replacing with penalty 1e6")
+            results[nonfinite_mask] = 1e6
+
+        # Ensure slight difference between objectives to avoid degenerate equal objectives
+        for i in range(results.shape[0]):
+            if results[i, 0] == results[i, 1]:
+                results[i, 1] = results[i, 1] + 1e-6
+
         out["F"] = results
     
      
@@ -137,69 +175,98 @@ class EvacuationProblem(Problem):
         Returns:
             Lista com os valores dos objetivos
         """
-        # Decodifica o gene para posições de portas
+        # Decode gene and prepare experiment directory and files
         door_positions = self._decode_gene(gene)
-        
-        # Gera arquivos de entrada para o simulador
+
         experiment_name = f"nsga_eval_{self.evaluation_count}"
         self.evaluation_count += 1
-        
-        # Cria o mapa com as portas posicionadas
+
         map_content = self._generate_map_with_doors(door_positions)
-        
-        # Salva arquivos temporários
+
         temp_dir = Path("temp_nsga") / experiment_name
         temp_dir.mkdir(parents=True, exist_ok=True)
-        
+
         map_file = temp_dir / "map.txt"
         individuals_file = temp_dir / "individuals.json"
-        
-        with open(map_file, 'w') as f:
-            f.write(map_content)
-        
-        with open(individuals_file, 'w') as f:
-            json.dump(self.individuals_template, f, indent=2)
-        
+
         try:
-            # Prepara o experimento
+            with open(map_file, 'w') as f:
+                f.write(map_content)
+
+            with open(individuals_file, 'w') as f:
+                json.dump(self.individuals_template, f, indent=2)
+
+            # Prepare experiment using the integration helper (copies files to simulator input)
             self.simulator_integration.prepare_experiment_from_uploads(
                 experiment_name, map_file, individuals_file
             )
-            
-            # Obtém parâmetros de simulação
+
             scenario_seed = self.simulation_params.get('scenario_seed')
             simulation_seed = self.simulation_params.get('simulation_seed')
             draw_mode = self.simulation_params.get('draw_mode', False)
-            
-            # Executa a simulação
-            result = self.simulator_integration.run_simulator_cli(
+
+            # Execute simulator CLI and capture output for debugging
+            proc = self.simulator_integration.run_simulator_cli(
                 experiment_name,
                 draw=draw_mode,
                 scenario_seed=scenario_seed,
                 simulation_seed=simulation_seed
             )
-            
-            # Lê os resultados
-            results = self.simulator_integration.read_results(experiment_name)
-            if results.get("error"):
-                print(f"Erro na leitura dos resultados: {results['error']}")
-                return [float('inf'), float('inf')]
-            # Extrai métricas reais
-            objectives = self._extract_objectives(results)
-            # Evita problema com todos os valores iguais
-            if objectives[0] == objectives[1]:
-                objectives[1] += 1e-3
-            return objectives
 
-            
+            # Log subprocess result when available
+            try:
+                rc = getattr(proc, 'returncode', None)
+                stdout = getattr(proc, 'stdout', None)
+                stderr = getattr(proc, 'stderr', None)
+                logger.debug("Simulator returncode=%s for experiment %s", rc, experiment_name)
+                if stdout:
+                    logger.debug("Simulator stdout (truncated): %s", str(stdout)[:1000])
+                if stderr:
+                    logger.debug("Simulator stderr (truncated): %s", str(stderr)[:1000])
+            except Exception:
+                rc = None
+                stdout = None
+                stderr = None
+
+            # Read results produced by the simulator (files in output/<experiment>)
+            results = self.simulator_integration.read_results(experiment_name)
+
+            if results.get("error"):
+                logger.error("read_results returned error for %s: %s", experiment_name, results.get('error'))
+                # No invented values: return explicit penalty but log for audit
+                return [1e6, 1e6]
+
+            # Extract numeric objectives safely
+            objectives = self._extract_objectives(results, stdout=stdout, stderr=stderr)
+
+            # Validate extracted objectives strictly
+            try:
+                t0 = float(objectives[0])
+                d0 = float(objectives[1])
+            except Exception:
+                logger.exception("Invalid objectives extracted for %s: %s", experiment_name, objectives)
+                # Return penalty but avoid inventing values
+                return [1e6, 1e6]
+
+            if not np.isfinite(t0) or not np.isfinite(d0):
+                logger.error("Non-finite objectives for %s: %s", experiment_name, (t0, d0))
+                return [1e6, 1e6]
+
+            # keep values as-is (do not invent or perturb)
+            return [t0, d0]
+
         except Exception as e:
-            print(f"Erro na avaliação do cromossomo: {e}")
-            return [float('inf'), float('inf')]
-        
+            logger.exception("Exception during evaluation of experiment %s", experiment_name)
+            return [1e6, 1e6]
+
         finally:
+            # Clean up temporary staging directory
             import shutil
-            if temp_dir.exists():
-                shutil.rmtree(temp_dir, ignore_errors=True)
+            try:
+                if temp_dir.exists():
+                    shutil.rmtree(temp_dir, ignore_errors=True)
+            except Exception as e:
+                print(f"DEBUG: Failed to remove temp_dir {temp_dir}: {e}")
 
     
     def _decode_gene(self, gene: Any) -> List[tuple]:
@@ -244,20 +311,98 @@ class EvacuationProblem(Problem):
         
         return '\n'.join(lines)
     
-    def _extract_objectives(self, results: Dict) -> List[float]:
+    def _extract_objectives(self, results: Dict, stdout: Optional[str] = None, stderr: Optional[str] = None) -> List[float]:
+        """
+        Extrai as métricas de interesse a partir do dicionário retornado por `read_results`.
+
+        Aceita diferentes formatos de `results`:
+        - Um dicionário contendo chaves 'tempo_total' e 'distancia_total'.
+        - Um dicionário onde 'metrics' é uma lista de caminhos de arquivos JSON/TXT que contém as métricas.
+        - Um dicionário com 'directory' apontando para a pasta de saída (procura por metrics*.json).
+
+        Retorna uma lista com dois floats: [tempo_total, distancia_total]. Em caso de falha,
+        retorna penalidades controladas [1e6, 1e6].
+        """
         try:
-            tempo_total = float(results.get("tempo_total", 1e6))  # valor grande se não existir
-            distancia_total = float(results.get("distancia_total", 1e6))
-            
-            # Protege contra valores inválidos
-            if np.isnan(tempo_total) or np.isinf(tempo_total):
-                tempo_total = 1e6
-            if np.isnan(distancia_total) or np.isinf(distancia_total):
-                distancia_total = 1e6
-            
-            return [tempo_total, distancia_total]
+            # Fast path: results already contain metrics
+            if isinstance(results, dict):
+                # If metrics already present as top-level numeric keys
+                if 'tempo_total' in results and 'distancia_total' in results:
+                    return [float(results['tempo_total']), float(results['distancia_total'])]
+                # Fallbacks for alternative names produced by GUI or simulator
+                if 'iterations' in results and 'distance' in results:
+                    return [float(results['iterations']), float(results['distance'])]
+                if 'iterations' in results and 'distancia_total' in results:
+                    return [float(results['iterations']), float(results['distancia_total'])]
+                if 'tempo_total' in results and 'distance' in results:
+                    return [float(results['tempo_total']), float(results['distance'])]
+
+                # If a metrics file list is provided, try to open the first JSON containing keys
+                metrics_candidates = results.get('metrics') or []
+                # If directory is provided, scan for metrics*.json
+                out_dir = results.get('directory')
+                if out_dir and not metrics_candidates:
+                    try:
+                        p = Path(out_dir)
+                        metrics_candidates = [str(p / f.name) for f in p.glob('metrics*.json')]
+                    except Exception:
+                        metrics_candidates = []
+
+                # Try to parse candidate files
+                for candidate in metrics_candidates:
+                    try:
+                        candidate_path = Path(candidate)
+                        if not candidate_path.exists():
+                            # candidate may already be a Path-like object
+                            continue
+                        with open(candidate_path, 'r') as fh:
+                            data = json.load(fh)
+                        # Accept nested structures: try common key names
+                        for t_key in ('tempo_total', 'total_time', 'time_total'):
+                            for d_key in ('distancia_total', 'total_distance', 'distance_total'):
+                                if t_key in data and d_key in data:
+                                    return [float(data[t_key]), float(data[d_key])]
+                                # also check under a 'metrics' object
+                                if 'metrics' in data and isinstance(data['metrics'], dict) and t_key in data['metrics'] and d_key in data['metrics']:
+                                    return [float(data['metrics'][t_key]), float(data['metrics'][d_key])]
+                    except Exception as e:
+                        print(f"DEBUG: Failed to parse metrics candidate {candidate}: {e}")
+
+                # If nothing found in metrics files, try parsing raw stdout/stderr for printed metrics
+                if stdout:
+                    try:
+                        s_iters = None
+                        s_dist = None
+                        for line in str(stdout).splitlines():
+                            line = line.strip()
+                            if line.startswith('qtd iteracoes'):
+                                try:
+                                    s_iters = int(line.split()[-1])
+                                except Exception:
+                                    pass
+                            if line.startswith('qtd distancia'):
+                                try:
+                                    s_dist = float(line.split()[-1])
+                                except Exception:
+                                    pass
+                        if s_iters is not None and s_dist is not None:
+                            return [float(s_iters), float(s_dist)]
+                    except Exception as e:
+                        print(f"DEBUG: Failed to parse stdout for metrics: {e}")
+
+            # If nothing found, log context and return penalties
+            print("DEBUG: Unable to extract tempo_total and distancia_total from simulator results. Returning penalties.")
+            # Optionally print stdout/stderr snippets to help debugging
+            if stdout:
+                print(f"DEBUG: Simulator stdout snippet: {str(stdout)[:1000]}")
+            if stderr:
+                print(f"DEBUG: Simulator stderr snippet: {str(stderr)[:1000]}")
+            return [1e6, 1e6]
+
         except Exception as e:
-            print(f"Erro ao extrair objetivos: {e}")
+            print(f"ERROR: Exception while extracting objectives: {e}")
+            import traceback
+            print(traceback.format_exc())
             return [1e6, 1e6]
 
 
@@ -501,28 +646,131 @@ class NSGAIntegration:
         Returns:
             True se salvou com sucesso, False caso contrário
         """
+        def _to_native(o):
+            """Recursively convert numpy types to native Python types for JSON serialization."""
+            try:
+                # numpy scalars
+                import numpy as _np
+                if isinstance(o, (_np.integer,)):
+                    return int(o)
+                if isinstance(o, (_np.floating,)):
+                    return float(o)
+                if isinstance(o, (_np.ndarray,)):
+                    return _to_native(o.tolist())
+            except Exception:
+                pass
+
+            if isinstance(o, list):
+                return [_to_native(x) for x in o]
+            if isinstance(o, tuple):
+                return tuple(_to_native(x) for x in o)
+            if isinstance(o, dict):
+                return {str(k): _to_native(v) for k, v in o.items()}
+            # Fallback: try to coerce numeric-like objects
+            try:
+                if hasattr(o, 'item'):
+                    return _to_native(o.item())
+                # try int/float conversions
+                try:
+                    return int(o)
+                except Exception:
+                    pass
+                try:
+                    return float(o)
+                except Exception:
+                    pass
+            except Exception:
+                pass
+            # builtin types (int, float, str, bool, None) are fine
+            return o
+
         try:
             results = []
             for i, (solution, objectives) in enumerate(zip(result.X, result.F)):
                 # Decodifica a solução para posições de portas
                 door_positions = []
                 for j, bit in enumerate(solution):
-                    if bit == 1 and j < len(self.problem.door_positions):
-                        door_positions.append(self.problem.door_positions[j])
-                
-                results.append({
-                    "solution_id": i,
-                    "gene": solution.tolist(),
-                    "door_positions": door_positions,
-                    "objectives": objectives.tolist(),
-                    "num_doors": sum(solution)
-                })
-            
-            with open(output_file, 'w') as f:
-                json.dump(results, f, indent=2)
-            
+                    if int(bit) == 1 and j < len(self.problem.door_positions):
+                        # ensure native ints
+                        dp = self.problem.door_positions[j]
+                        if isinstance(dp, (list, tuple)):
+                            dp = (int(dp[0]), int(dp[1]))
+                        door_positions.append(dp)
+
+                res_obj = {
+                    "solution_id": int(i),
+                    "gene": _to_native(solution.tolist()),
+                    "door_positions": _to_native(door_positions),
+                    "objectives": _to_native(objectives.tolist()),
+                    "num_doors": int(int(sum(solution)))
+                }
+                results.append(res_obj)
+
+            # Atomic write: write to temp file then replace
+            tmp_path = output_file.with_suffix('.tmp')
+            try:
+                with open(tmp_path, 'w') as f:
+                    json.dump(results, f, indent=2)
+                # replace atomically
+                tmp_path.replace(output_file)
+            finally:
+                if tmp_path.exists():
+                    try:
+                        tmp_path.unlink()
+                    except Exception:
+                        pass
+
+            # Aggregate per-eval metrics into consolidated metrics.json for the main experiment
+            try:
+                # Attempt to infer simulation_name from output_file name: results_<simname>_timestamp.json
+                sim_name = None
+                parts = output_file.stem.split('_')
+                if len(parts) >= 2 and parts[0] == 'results':
+                    sim_name = parts[1]
+                if sim_name:
+                    base_output = Path(self.simulator_integration.output_path)
+                    consolidated_dir = base_output / sim_name
+                    consolidated_dir.mkdir(parents=True, exist_ok=True)
+
+                    # Collect nsga_eval_* subdirs
+                    evals = []
+                    eval_base = base_output
+                    for p in sorted(eval_base.glob('nsga_eval_*')):
+                        metrics_file = p / 'metrics.json'
+                        if metrics_file.exists():
+                            try:
+                                data = json.loads(metrics_file.read_text())
+                                # normalize keys and types
+                                t = data.get('tempo_total') or data.get('iterations') or data.get('qtd_iteracoes')
+                                d = data.get('distancia_total') or data.get('distance') or data.get('qtd_distancia')
+                                evals.append({
+                                    'eval': p.name,
+                                    'tempo_total': float(t) if t is not None else None,
+                                    'distancia_total': float(d) if d is not None else None,
+                                })
+                            except Exception as e:
+                                print(f"DEBUG: failed to read/parse {metrics_file}: {e}")
+
+                    consolidated = {
+                        'algorithm': 'NSGA-II',
+                        'simulation_name': sim_name,
+                        'num_evals': len(evals),
+                        'evaluations': evals
+                    }
+                    consolidated_path = consolidated_dir / 'metrics.json'
+                    # atomic write
+                    tmp_c = consolidated_path.with_suffix('.tmp')
+                    with open(tmp_c, 'w') as f:
+                        json.dump(consolidated, f, indent=2)
+                    tmp_c.replace(consolidated_path)
+
+            except Exception as e:
+                print(f"DEBUG: failed to aggregate per-eval metrics: {e}")
+
             return True
-            
+
         except Exception as e:
             print(f"Erro ao salvar resultados: {e}")
+            import traceback
+            print(traceback.format_exc())
             return False

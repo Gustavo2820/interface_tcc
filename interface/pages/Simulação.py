@@ -514,8 +514,12 @@ if st.session_state.run_sim:
                     metrics = {}
                     if iters is not None:
                         metrics["iterations"] = iters
+                        # Map to expected key for NSGA integration
+                        metrics["tempo_total"] = iters
                     if dist is not None:
                         metrics["distance"] = dist
+                        # Map to expected key for NSGA integration
+                        metrics["distancia_total"] = dist
                     if mean_distance_series:
                         metrics["mean_distance_series"] = mean_distance_series
                     if evacuated_progress:
@@ -524,8 +528,16 @@ if st.session_state.run_sim:
                     metrics["scenario_seed"] = scenario_seed
                     metrics["simulation_seed"] = simulation_seed
                     if metrics:
-                        with open(out_dir / "metrics.json", "w") as f:
+                        metrics_path = out_dir / "metrics.json"
+                        with open(metrics_path, "w") as f:
                             json.dump(metrics, f, indent=2)
+                        # quick verification log
+                        try:
+                            written = metrics_path.read_text()
+                            st.info(f"Metrics written to {metrics_path}")
+                            st.code(written)
+                        except Exception as e:
+                            st.warning(f"Não foi possível ler metrics.json após escrita: {e}")
                 except Exception as e:
                     st.warning(f"Falha ao salvar métricas: {e}")
 

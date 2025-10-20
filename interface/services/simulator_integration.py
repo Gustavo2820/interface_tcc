@@ -14,7 +14,18 @@ from typing import Dict, List, Optional, Tuple
 import sqlite3
 
 # ======= STRUCTURE MAP =======
-from simulador_heuristica.simulator.constants import Constants
+# Import 'simulador_heuristica' in a robust way: if the package isn't on sys.path
+# (for example when Streamlit imports modules from the `interface/` folder),
+# insert the project root into sys.path and retry the import.
+try:
+    from simulador_heuristica.simulator.constants import Constants
+except Exception:
+    current_file = Path(__file__).resolve()
+    # project_root points to repository root (two levels up from interface/services)
+    project_root = current_file.parents[2]
+    if str(project_root) not in sys.path:
+        sys.path.insert(0, str(project_root))
+    from simulador_heuristica.simulator.constants import Constants
 
 class StructureMap(object):
     """Responsável por armazenar informações físicas do mapa: portas, paredes, etc."""
