@@ -111,15 +111,16 @@ class EvacuationProblem(Problem):
         self.door_positions = door_positions
         self.simulation_params = simulation_params or {}
         self.evaluation_count = 0
-        
-        # Define um problema com 2 objetivos e n variáveis binárias (uma para cada posição de porta)
-        n_var = len(door_positions)
+    # Define um problema com 2 objetivos e n variáveis binárias (uma para cada posição de porta)
+    # Objetivos (legacy adjusted): [num_doors, distance]
+        # initialize base Problem now that self.door_positions is set
+        n_var = len(self.door_positions)
         super().__init__(n_var=n_var, n_obj=2, n_constr=0, xl=0, xu=1, type_var=bool)
     
     def _evaluate(self, x, out, *args, **kwargs):
         """
         Avalia uma população de soluções.
-        
+
         Args:
             x: Matriz de soluções (pop_size x n_var)
             out: Dicionário de saída onde 'F' contém os objetivos
@@ -129,7 +130,7 @@ class EvacuationProblem(Problem):
 
         try:
             results = np.asarray(raw, dtype=float)
-        except Exception as e:
+        except Exception:
             logger.exception("Failed to convert evaluation results to array")
             # do not invent values; fail safe by assigning large penalty but log as ERROR
             results = np.full((len(x), 2), 1e6, dtype=float)
@@ -139,11 +140,11 @@ class EvacuationProblem(Problem):
             results = np.tile(results, (len(x), 1))
         elif results.ndim == 1 and results.size != 2:
             # Unexpected shape, set penalties
-            print(f"DEBUG: Unexpected evaluation shape {results.shape}, applying penalties")
+            logger.debug(f"Unexpected evaluation shape {results.shape}, applying penalties")
             results = np.full((len(x), 2), 1e6, dtype=float)
         elif results.ndim == 2 and results.shape[1] != 2:
             # If more/less objectives returned, try to truncate or pad
-            print(f"DEBUG: Evaluation returned {results.shape[1]} objectives per individual; adjusting to 2")
+            logger.debug(f"Evaluation returned {results.shape[1]} objectives per individual; adjusting to 2")
             if results.shape[1] > 2:
                 results = results[:, :2]
             else:
@@ -159,8 +160,9 @@ class EvacuationProblem(Problem):
 
         # Ensure slight difference between objectives to avoid degenerate equal objectives
         for i in range(results.shape[0]):
-            if results[i, 0] == results[i, 1]:
-                results[i, 1] = results[i, 1] + 1e-6
+            for a in range(results.shape[1]-1):
+                if results[i, a] == results[i, a+1]:
+                    results[i, a+1] = results[i, a+1] + 1e-6
 
         out["F"] = results
     
@@ -172,8 +174,8 @@ class EvacuationProblem(Problem):
         Args:
             gene: Vetor binário representando quais portas usar
             
-        Returns:
-            Lista com os valores dos objetivos
+            Returns:
+            Lista com os valores dos 3 objetivos na ordem [num_doors, iterations, distance]
         """
         # Decode gene and prepare experiment directory and files
         door_positions = self._decode_gene(gene)
@@ -236,24 +238,29 @@ class EvacuationProblem(Problem):
                 # No invented values: return explicit penalty but log for audit
                 return [1e6, 1e6]
 
-            # Extract numeric objectives safely
-            objectives = self._extract_objectives(results, stdout=stdout, stderr=stderr)
+            # Determine first objective (num_doors) from selected door positions
+            num_doors = len(door_positions)
 
-            # Validate extracted objectives strictly
+            # Extract numeric objective distance (and optionally num_doors) from results
+            obj = self._extract_objectives(results, stdout=stdout, stderr=stderr, num_doors=num_doors)
+
+            # _extract_objectives returns [num_doors, distance]
             try:
-                t0 = float(objectives[0])
-                d0 = float(objectives[1])
+                num_doors_val = float(obj[0]) if obj and obj[0] is not None else float(num_doors)
             except Exception:
-                logger.exception("Invalid objectives extracted for %s: %s", experiment_name, objectives)
-                # Return penalty but avoid inventing values
-                return [1e6, 1e6]
+                num_doors_val = float(num_doors)
+            try:
+                distance_val = float(obj[1]) if obj and obj[1] is not None else None
+            except Exception:
+                distance_val = None
 
-            if not np.isfinite(t0) or not np.isfinite(d0):
-                logger.error("Non-finite objectives for %s: %s", experiment_name, (t0, d0))
-                return [1e6, 1e6]
+            # Do not penalize iterations (auxiliary metric). Only penalize distance if missing
+            if distance_val is None or not np.isfinite(distance_val):
+                logger.warning("Missing or non-finite distance for %s, applying penalty", experiment_name)
+                distance_val = 1e6
 
-            # keep values as-is (do not invent or perturb)
-            return [t0, d0]
+            # Return objectives as floats: [num_doors, distance]
+            return [float(num_doors_val), float(distance_val)]
 
         except Exception as e:
             logger.exception("Exception during evaluation of experiment %s", experiment_name)
@@ -311,31 +318,33 @@ class EvacuationProblem(Problem):
         
         return '\n'.join(lines)
     
-    def _extract_objectives(self, results: Dict, stdout: Optional[str] = None, stderr: Optional[str] = None) -> List[float]:
+    def _extract_objectives(self, results: Dict, stdout: Optional[str] = None, stderr: Optional[str] = None, num_doors: Optional[int] = None) -> List[Optional[float]]:
         """
         Extrai as métricas de interesse a partir do dicionário retornado por `read_results`.
+        Para compatibilidade com os experiments legacy, procura preferencialmente por:
+        - 'distancia' / 'distance' / 'qtdDistance' / 'distancia_total' -> distance objective
 
-        Aceita diferentes formatos de `results`:
-        - Um dicionário contendo chaves 'tempo_total' e 'distancia_total'.
-        - Um dicionário onde 'metrics' é uma lista de caminhos de arquivos JSON/TXT que contém as métricas.
-        - Um dicionário com 'directory' apontando para a pasta de saída (procura por metrics*.json).
+        Nota: 'iterations' é considerada uma métrica auxiliar e NÃO é tratada como objetivo.
 
-        Retorna uma lista com dois floats: [tempo_total, distancia_total]. Em caso de falha,
-        retorna penalidades controladas [1e6, 1e6].
+        Retorna uma lista com dois elementos: [num_doors, distance]. num_doors pode ser fornecido
+        pelo chamador (a partir do gene) e será usado por preferência; caso contrário, retornará None
+        no primeiro elemento.
         """
         try:
             # Fast path: results already contain metrics
             if isinstance(results, dict):
-                # If metrics already present as top-level numeric keys
-                if 'tempo_total' in results and 'distancia_total' in results:
-                    return [float(results['tempo_total']), float(results['distancia_total'])]
-                # Fallbacks for alternative names produced by GUI or simulator
-                if 'iterations' in results and 'distance' in results:
-                    return [float(results['iterations']), float(results['distance'])]
-                if 'iterations' in results and 'distancia_total' in results:
-                    return [float(results['iterations']), float(results['distancia_total'])]
-                if 'tempo_total' in results and 'distance' in results:
-                    return [float(results['tempo_total']), float(results['distance'])]
+                # If explicit metrics already present as top-level numeric keys, prefer distance keys
+                distance_keys = ['distance', 'avg_distance', 'qtdDistance', 'qtd_distancia', 'qtd_distance', 'distancia', 'total_distance', 'distancia_total']
+                d_key = next((k for k in distance_keys if k in results), None)
+                d_val = None
+                if d_key:
+                    try:
+                        d_val = float(results[d_key])
+                    except Exception:
+                        d_val = None
+                    # num_doors preference: take provided num_doors if available
+                    nd = float(num_doors) if num_doors is not None else None
+                    return [nd, d_val]
 
                 # If a metrics file list is provided, try to open the first JSON containing keys
                 metrics_candidates = results.get('metrics') or []
@@ -348,7 +357,7 @@ class EvacuationProblem(Problem):
                     except Exception:
                         metrics_candidates = []
 
-                # Try to parse candidate files
+                # Try to parse candidate files (prefer explicit iteration and distance keys)
                 for candidate in metrics_candidates:
                     try:
                         candidate_path = Path(candidate)
@@ -357,53 +366,75 @@ class EvacuationProblem(Problem):
                             continue
                         with open(candidate_path, 'r') as fh:
                             data = json.load(fh)
-                        # Accept nested structures: try common key names
-                        for t_key in ('tempo_total', 'total_time', 'time_total'):
-                            for d_key in ('distancia_total', 'total_distance', 'distance_total'):
-                                if t_key in data and d_key in data:
-                                    return [float(data[t_key]), float(data[d_key])]
-                                # also check under a 'metrics' object
-                                if 'metrics' in data and isinstance(data['metrics'], dict) and t_key in data['metrics'] and d_key in data['metrics']:
-                                    return [float(data['metrics'][t_key]), float(data['metrics'][d_key])]
+                        # Accept nested structures: try explicit distance key names (including legacy keys)
+                        d_key = next((k for k in ('distance','avg_distance','qtdDistance','qtd_distancia','qtd_distance','distancia','total_distance','distancia_total') if k in data), None)
+                        if d_key:
+                            try:
+                                d_val = float(data[d_key])
+                            except Exception:
+                                d_val = None
+                            nd = float(num_doors) if num_doors is not None else None
+                            return [nd, d_val]
+                        # also check under a 'metrics' object
+                        # also check under a 'metrics' object for distance
+                        if 'metrics' in data and isinstance(data['metrics'], dict):
+                            d_key = next((k for k in ('distance','avg_distance','qtdDistance','qtd_distancia','qtd_distance','distancia','total_distance','distancia_total') if k in data['metrics']), None)
+                            if d_key:
+                                try:
+                                    d_val = float(data['metrics'][d_key])
+                                except Exception:
+                                    d_val = None
+                                nd = float(num_doors) if num_doors is not None else None
+                                return [nd, d_val]
                     except Exception as e:
-                        print(f"DEBUG: Failed to parse metrics candidate {candidate}: {e}")
+                        logger.debug(f"Failed to parse metrics candidate {candidate}: {e}")
 
-                # If nothing found in metrics files, try parsing raw stdout/stderr for printed metrics
+                # If nothing found in metrics files, try parsing raw stdout/stderr for explicit printed time/distance
                 if stdout:
                     try:
-                        s_iters = None
+                        s_time = None
                         s_dist = None
                         for line in str(stdout).splitlines():
-                            line = line.strip()
-                            if line.startswith('qtd iteracoes'):
-                                try:
-                                    s_iters = int(line.split()[-1])
-                                except Exception:
-                                    pass
-                            if line.startswith('qtd distancia'):
-                                try:
-                                    s_dist = float(line.split()[-1])
-                                except Exception:
-                                    pass
-                        if s_iters is not None and s_dist is not None:
-                            return [float(s_iters), float(s_dist)]
+                            line = line.strip().lower()
+                            # Look for explicit time lines
+                            if 'tempo' in line and any(tok in line for tok in ('tempo','time')):
+                                # attempt to parse a float from the line
+                                parts = line.replace(',', '.').split()
+                                for p in reversed(parts):
+                                    try:
+                                        s_time = float(p)
+                                        break
+                                    except Exception:
+                                        continue
+                            # Look for explicit distance lines
+                            # also capture legacy printed tokens like 'qtdDistance' or 'qtd distancia'
+                            if 'dist' in line or 'distância' in line or 'distance' in line or 'qtd' in line:
+                                parts = line.replace(',', '.').split()
+                                for p in reversed(parts):
+                                    try:
+                                        s_dist = float(p)
+                                        break
+                                    except Exception:
+                                        continue
+                        # prefer distance parsing from stdout
+                        if s_dist is not None:
+                            nd = float(num_doors) if num_doors is not None else None
+                            return [nd, float(s_dist)]
                     except Exception as e:
-                        print(f"DEBUG: Failed to parse stdout for metrics: {e}")
+                        logger.debug(f"Failed to parse stdout for metrics: {e}")
 
-            # If nothing found, log context and return penalties
-            print("DEBUG: Unable to extract tempo_total and distancia_total from simulator results. Returning penalties.")
+            # If nothing found (for iterations and distance), log context and return Nones
+            logger.debug("Unable to extract iterations and distance from simulator results. Returning Nones.")
             # Optionally print stdout/stderr snippets to help debugging
             if stdout:
-                print(f"DEBUG: Simulator stdout snippet: {str(stdout)[:1000]}")
+                logger.debug(f"Simulator stdout snippet: {str(stdout)[:1000]}")
             if stderr:
-                print(f"DEBUG: Simulator stderr snippet: {str(stderr)[:1000]}")
-            return [1e6, 1e6]
+                logger.debug(f"Simulator stderr snippet: {str(stderr)[:1000]}")
+            return [None, None]
 
         except Exception as e:
-            print(f"ERROR: Exception while extracting objectives: {e}")
-            import traceback
-            print(traceback.format_exc())
-            return [1e6, 1e6]
+            logger.exception(f"Exception while extracting objectives: {e}")
+            return [None, None]
 
 
 
@@ -697,12 +728,53 @@ class NSGAIntegration:
                             dp = (int(dp[0]), int(dp[1]))
                         door_positions.append(dp)
 
+                # Objectives expected to be [num_doors, distance] (2 elements)
+                # Convert numpy arrays to native lists if necessary
+                try:
+                    obj_list = objectives.tolist()
+                except Exception:
+                    # if objectives is a list/tuple
+                    obj_list = list(objectives)
+
+                # Ensure the objectives array length is 2
+                if len(obj_list) > 2:
+                    obj_list = obj_list[:2]
+                elif len(obj_list) < 2:
+                    # pad missing distance with None (caller/consumer may apply penalties)
+                    obj_list = obj_list + [None] * (2 - len(obj_list))
+
+                # attempt to get auxiliary iterations value from per-eval metrics if available
+                aux_iterations = None
+                try:
+                    # some result objects embed auxiliary info; otherwise will be filled during aggregation
+                    aux_iterations = getattr(objectives, 'iterations', None)
+                except Exception:
+                    aux_iterations = None
+
+                # If no auxiliary iterations found on the objectives object, try reading
+                # the per-eval metrics file produced by the simulator for this evaluation.
+                # The simulator writes metrics to simulador_heuristica/output/nsga_eval_<id>/metrics.json
+                if aux_iterations is None:
+                    try:
+                        base_output = Path(self.simulator_integration.output_path)
+                        eval_dir = base_output / f'nsga_eval_{i}'
+                        metrics_file = eval_dir / 'metrics.json'
+                        if metrics_file.exists():
+                            try:
+                                md = json.loads(metrics_file.read_text())
+                                aux_iterations = md.get('iterations') or md.get('qtd_iteracoes') or md.get('iters') or md.get('tempo_total')
+                            except Exception:
+                                aux_iterations = None
+                    except Exception:
+                        aux_iterations = None
+
                 res_obj = {
                     "solution_id": int(i),
                     "gene": _to_native(solution.tolist()),
                     "door_positions": _to_native(door_positions),
-                    "objectives": _to_native(objectives.tolist()),
-                    "num_doors": int(int(sum(solution)))
+                    "objectives": _to_native(obj_list),
+                    "num_doors": int(int(sum(solution))),
+                    "iterations": int(aux_iterations) if aux_iterations is not None else None
                 }
                 results.append(res_obj)
 
@@ -732,24 +804,31 @@ class NSGAIntegration:
                     consolidated_dir = base_output / sim_name
                     consolidated_dir.mkdir(parents=True, exist_ok=True)
 
-                    # Collect nsga_eval_* subdirs
+                    # Collect any metrics.json files under the simulator output tree (recursive)
                     evals = []
-                    eval_base = base_output
-                    for p in sorted(eval_base.glob('nsga_eval_*')):
-                        metrics_file = p / 'metrics.json'
-                        if metrics_file.exists():
-                            try:
-                                data = json.loads(metrics_file.read_text())
-                                # normalize keys and types
-                                t = data.get('tempo_total') or data.get('iterations') or data.get('qtd_iteracoes')
-                                d = data.get('distancia_total') or data.get('distance') or data.get('qtd_distancia')
-                                evals.append({
-                                    'eval': p.name,
-                                    'tempo_total': float(t) if t is not None else None,
-                                    'distancia_total': float(d) if d is not None else None,
-                                })
-                            except Exception as e:
-                                print(f"DEBUG: failed to read/parse {metrics_file}: {e}")
+                    for metrics_file in sorted(base_output.rglob('metrics.json')):
+                        try:
+                            # ignore consolidated per-simulation metrics.json (those live under base_output/<sim_name>/metrics.json)
+                            # but accept any per-eval metrics.json produced by simulator runs
+                            data = json.loads(metrics_file.read_text())
+                            d = data.get('distancia_total') or data.get('total_distance') or data.get('distance') or data.get('qtdDistance')
+                            it = (
+                                data.get('iterations') or
+                                data.get('tempo_total') or
+                                data.get('total_time') or
+                                data.get('qtd_iteracoes') or
+                                data.get('iters')
+                            )
+                            nd = data.get('num_doors') or data.get('qtd_doors') or None
+                            evals.append({
+                                'eval': metrics_file.parent.name,
+                                'path': str(metrics_file),
+                                'distancia_total': float(d) if d is not None else None,
+                                'num_doors': int(nd) if nd is not None else None,
+                                'iterations': int(it) if it is not None else None
+                            })
+                        except Exception as e:
+                            logger.debug(f"failed to read/parse {metrics_file}: {e}")
 
                     consolidated = {
                         'algorithm': 'NSGA-II',
@@ -763,6 +842,76 @@ class NSGAIntegration:
                     with open(tmp_c, 'w') as f:
                         json.dump(consolidated, f, indent=2)
                     tmp_c.replace(consolidated_path)
+
+                    # Backfill iterations into the per-solution results file by matching evaluations
+                    try:
+                        # load previously written results file (output_file)
+                        if output_file.exists():
+                            try:
+                                raw_results = json.loads(output_file.read_text())
+                            except Exception:
+                                raw_results = results
+                        else:
+                            raw_results = results
+
+                        # Helper to extract numeric distance from eval entry
+                        def _eval_distance(e):
+                            for k in ('distancia_total','distancia','distance','dist'):
+                                if k in e and e.get(k) is not None:
+                                    try:
+                                        return float(e.get(k))
+                                    except Exception:
+                                        try:
+                                            return float(str(e.get(k)).replace(',','.'))
+                                        except Exception:
+                                            return None
+                            return None
+
+                        # Try to match each saved result to an evaluation and set iterations when found
+                        for r in raw_results:
+                            if r.get('iterations') is None:
+                                r_num = r.get('num_doors')
+                                r_dist = None
+                                try:
+                                    if isinstance(r.get('objectives'), (list,tuple)) and len(r.get('objectives')) >= 2:
+                                        r_dist = float(r.get('objectives')[1])
+                                except Exception:
+                                    r_dist = None
+
+                                matched_iter = None
+                                for e in evals:
+                                    try:
+                                        ev_num = e.get('num_doors')
+                                        ev_dist = _eval_distance(e)
+                                        if ev_num is not None and r_num is not None and int(ev_num) == int(r_num):
+                                            # If both distances available, require approximate match; otherwise accept num match
+                                            if r_dist is not None and ev_dist is not None:
+                                                try:
+                                                    if abs(float(ev_dist) - float(r_dist)) <= max(1e-6, 0.001 * abs(float(r_dist))):
+                                                        matched_iter = e.get('iterations') or e.get('qtd_iteracoes') or e.get('iters') or e.get('tempo_total')
+                                                        break
+                                                except Exception:
+                                                    continue
+                                            else:
+                                                matched_iter = e.get('iterations') or e.get('qtd_iteracoes') or e.get('iters') or e.get('tempo_total')
+                                                break
+                                    except Exception:
+                                        continue
+
+                                if matched_iter is not None:
+                                    try:
+                                        # coerce to int if possible
+                                        r['iterations'] = int(matched_iter)
+                                    except Exception:
+                                        r['iterations'] = matched_iter
+
+                        # rewrite updated results atomically
+                        tmp_r = output_file.with_suffix('.tmp')
+                        with open(tmp_r, 'w') as f:
+                            json.dump(raw_results, f, indent=2)
+                        tmp_r.replace(output_file)
+                    except Exception as e:
+                        logger.debug(f"failed to backfill iterations into results file: {e}")
 
             except Exception as e:
                 print(f"DEBUG: failed to aggregate per-eval metrics: {e}")

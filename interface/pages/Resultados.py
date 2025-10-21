@@ -231,8 +231,10 @@ if selected_name:
                 try:
                     with open(mf, 'r') as f:
                         data = json.load(f)
-                        iterations_value = data.get('iterations')
-                        distance_value = data.get('distance')
+                        # Accept multiple historical key names: prefer explicit 'iterations' but fallback to simulator's 'tempo_total'
+                        iterations_value = data.get('iterations') or data.get('tempo_total') or data.get('total_time')
+                        # distance may be stored under different keys historically
+                        distance_value = data.get('distance') or data.get('distancia_total') or data.get('total_distance')
 
                         col1, col2 = st.columns(2)
                         with col1:
@@ -246,7 +248,7 @@ if selected_name:
                             st.markdown(f"""
                                 <div class='metric-card'>
                                     <div class='metric-label'>Distância</div>
-                                    <div class='metric-value'>{round(distance_value,3)}</div>
+                                    <div class='metric-value'>{round(distance_value,3) if distance_value is not None else None}</div>
                                 </div>
                             """, unsafe_allow_html=True)
                         # Série temporal se disponível
@@ -363,6 +365,12 @@ if selected_name:
                         options = [f"gen {it.get('generation',0)} - obj {it.get('objectives',[None,None])}" for it in data_pf]
                         idx_sel = st.selectbox("Escolha uma solução da frente de Pareto", options=list(range(len(options))), format_func=lambda i: options[i])
                         sol = data_pf[idx_sel]
+                        # Small friendly info under the NSGA section
+                        st.markdown("""
+                        <div style='background:#0f1720;padding:10px;border-radius:8px;margin-bottom:10px'>
+                        <small style='color:#cbd5e1'>Dica: "Iterações" é uma métrica auxiliar registrada por simulação. Se estiver ausente na solução, procuramos no arquivo de métricas consolidado desta simulação.</small>
+                        </div>
+                        """, unsafe_allow_html=True)
                         # attempt to load map layout from input folder for this simulation
                         map_layout = None
                         try:
@@ -379,41 +387,158 @@ if selected_name:
                             with st.container():
                                 st.markdown(f"### Solução {solution.get('solution_id')}")
 
-                                # Objectives
+                                # Objectives mapping (handle both 2- and 3-objective result formats):
+                                # - If len == 2: [num_doors, distance]
+                                # - If len >=3: [num_doors, iterations, distance] (iterations treated as auxiliary)
                                 objs = solution.get('objectives') or []
-                                t_label = 'tempo_total'
-                                d_label = 'distancia_total'
-                                t_val = objs[0] if len(objs) > 0 else None
-                                d_val = objs[1] if len(objs) > 1 else None
+                                label_doors = 'Num portas'
+                                label_iters = 'Iterações'
+                                label_dist = 'Distância'
 
-                                # Use Streamlit metrics for a clean, intuitive display
+                                # Determine values robustly
+                                doors_val = None
+                                iters_val = None
+                                dist_val = None
+
+                                if len(objs) >= 1:
+                                    doors_val = objs[0]
+                                else:
+                                    doors_val = solution.get('num_doors') or solution.get('num_doors', None)
+
+                                if len(objs) == 2:
+                                    # legacy/compact format: [num_doors, distance]
+                                    dist_val = objs[1]
+                                    # iterations should be read from auxiliary fields if present
+                                    iters_val = solution.get('iterations') or solution.get('iteracoes') or solution.get('qtd_iteracoes')
+                                elif len(objs) >= 3:
+                                    # full format: [num_doors, iterations, distance]
+                                    iters_val = objs[1]
+                                    dist_val = objs[2]
+                                else:
+                                    # no objectives array: try auxiliary fields
+                                    iters_val = solution.get('iterations') or solution.get('iteracoes') or solution.get('qtd_iteracoes')
+                                    dist_val = solution.get('distancia') or solution.get('distance') or solution.get('distancia_total')
+
+                                # As extra fallback, check for distance-like auxiliary keys
+                                if dist_val is None:
+                                    dist_val = solution.get('distancia') or solution.get('distance') or solution.get('distancia_total')
+
+                                # If iterations still missing, try to find it in the simulation metrics collected for this run (res in outer scope)
+                                if iters_val is None:
+                                    try:
+                                        metrics_candidates = res.get('metrics', [])
+                                        for candidate in metrics_candidates:
+                                            try:
+                                                if str(candidate).endswith('.json'):
+                                                    with open(candidate, 'r') as fh:
+                                                        md = json.load(fh)
+                                                    # direct top-level iterations
+                                                    it = md.get('iterations') or md.get('qtd_iteracoes') or md.get('iters')
+                                                    if it is not None:
+                                                        iters_val = it
+                                                        break
+                                                    # check consolidated structure produced by NSGA save_results
+                                                    evs = md.get('evaluations') or md.get('evals') or None
+                                                    if isinstance(evs, list) and evs:
+                                                        # find first non-null iterations entry
+                                                        for e in evs:
+                                                            if e is None:
+                                                                continue
+                                                            if isinstance(e, dict):
+                                                                cand_it = e.get('iterations') or e.get('qtd_iteracoes') or e.get('iters')
+                                                                if cand_it is not None:
+                                                                    iters_val = cand_it
+                                                                    break
+                                                        if iters_val is not None:
+                                                            break
+                                            except Exception:
+                                                continue
+                                    except Exception:
+                                        pass
+
+                                        # Additional fallback: if we still don't have iterations, try consolidated metrics
+                                        # under simulador_heuristica/output/<selected_name>/metrics.json produced by NSGA aggregation.
+                                        if iters_val is None:
+                                            try:
+                                                from pathlib import Path as _P
+                                                cons_path = _P('simulador_heuristica') / 'output' / (selected_name or '') / 'metrics.json'
+                                                if cons_path.exists():
+                                                    try:
+                                                        with open(cons_path, 'r') as cf:
+                                                            cons = json.load(cf)
+                                                        evs = cons.get('evaluations') or []
+                                                        # prepare solution matching keys
+                                                        try:
+                                                            sol_num_doors = int(doors_val) if doors_val is not None else int(solution.get('num_doors') or 0)
+                                                        except Exception:
+                                                            sol_num_doors = None
+                                                        try:
+                                                            sol_dist = float(dist_val) if dist_val is not None else None
+                                                        except Exception:
+                                                            sol_dist = None
+
+                                                        for e in evs:
+                                                            try:
+                                                                ev_num = e.get('num_doors')
+                                                                ev_dist = e.get('distancia_total') if e.get('distancia_total') is not None else e.get('distancia') or e.get('distance') or e.get('dist')
+                                                                if sol_num_doors is not None and ev_num is not None and int(sol_num_doors) == int(ev_num):
+                                                                    matched = False
+                                                                    if sol_dist is not None and ev_dist is not None:
+                                                                        try:
+                                                                            if abs(float(ev_dist) - float(sol_dist)) <= max(1e-6, 0.001 * abs(float(sol_dist))):
+                                                                                matched = True
+                                                                        except Exception:
+                                                                            matched = False
+                                                                    else:
+                                                                        matched = True
+
+                                                                    if matched:
+                                                                        iters_val = e.get('iterations') or e.get('qtd_iteracoes') or e.get('iters') or e.get('tempo_total')
+                                                                        break
+                                                            except Exception:
+                                                                continue
+                                                    except Exception:
+                                                        pass
+                                            except Exception:
+                                                pass
+
+                                        # Use Streamlit metrics for a clean, intuitive display
                                 cols = st.columns([1,1,2])
                                 with cols[0]:
                                     try:
-                                        st.metric(label=t_label.replace('_',' ').title(), value=str(round(float(t_val),3)) if t_val is not None else '—')
+                                        st.metric(label=label_doors, value=str(int(doors_val)) if doors_val is not None else '—')
                                     except Exception:
-                                        st.markdown(f"**{t_label.replace('_',' ').title()}**: {t_val}")
+                                        st.markdown(f"**{label_doors}**: {doors_val}")
                                 with cols[1]:
                                     try:
-                                        st.metric(label=d_label.replace('_',' ').title(), value=str(round(float(d_val),3)) if d_val is not None else '—')
+                                        if iters_val is None:
+                                            display_iters = 'Não definido'
+                                        else:
+                                            display_iters = str(int(iters_val)) if float(iters_val).is_integer() else str(round(float(iters_val), 3))
+                                        st.metric(label=label_iters, value=display_iters)
                                     except Exception:
-                                        st.markdown(f"**{d_label.replace('_',' ').title()}**: {d_val}")
+                                        st.markdown(f"**{label_iters}**: {iters_val}")
+                                with cols[2]:
+                                    try:
+                                        st.metric(label=label_dist, value=str(round(float(dist_val),3)) if dist_val is not None else '—')
+                                    except Exception:
+                                        st.markdown(f"**{label_dist}**: {dist_val}")
                                 with cols[2]:
                                     st.markdown('**Gene**')
                                     gene = solution.get('gene') or []
-                                    if isinstance(gene, list):
-                                        # compact representation, wrap lines for long genes
-                                        try:
-                                            symbols = ['✓' if int(x) else '✗' for x in gene]
-                                            # split into rows of 40 for readability
-                                            row_len = 40
-                                            rows = [''.join(symbols[i:i+row_len]) for i in range(0, len(symbols), row_len)]
-                                            for r in rows:
-                                                st.code(r)
-                                        except Exception:
-                                            st.code(str(gene))
-                                        st.markdown(f"**Num portas:** {int(solution.get('num_doors', sum(gene) if gene else 0))}")
-                                    else:
+                                    try:
+                                        # Accept lists, tuples, numpy arrays
+                                        seq = list(gene)
+                                        symbols = ['✓' if int(x) else '✗' for x in seq]
+                                        # split into rows of 40 for readability
+                                        row_len = 40
+                                        rows = [''.join(symbols[i:i+row_len]) for i in range(0, len(symbols), row_len)]
+                                        for r in rows:
+                                            st.code(r)
+                                        num_doors_calc = int(solution.get('num_doors', sum(int(bool(x)) for x in seq)))
+                                        st.markdown(f"**Num portas:** {num_doors_calc}")
+                                    except Exception:
+                                        # Fallback: render as-is
                                         st.write(gene)
 
                                 # Door positions
@@ -458,8 +583,8 @@ if selected_name:
                                                 continue
 
                                         # Larger target cell size for readability, but cap overall image
-                                        target_cell_px = 22
-                                        max_total_px = 1400
+                                        target_cell_px = 28
+                                        max_total_px = 1800
                                         est_w_px = grid_w * target_cell_px
                                         est_h_px = grid_h * target_cell_px
                                         scale = min(1.0, max_total_px / max(est_w_px, est_h_px, 1))
@@ -483,7 +608,8 @@ if selected_name:
                                         fig.savefig(buf, format='png', bbox_inches='tight')
                                         _plt.close(fig)
                                         buf.seek(0)
-                                        st.image(buf, use_column_width=True)
+                                        # use_container_width is the current Streamlit parameter
+                                        st.image(buf, use_container_width=True)
                                     except Exception:
                                         st.text('Não foi possível desenhar o mini-mapa.')
 

@@ -8,6 +8,7 @@ e botões de navegação para outras funcionalidades.
 import streamlit as st
 import pandas as pd
 from pathlib import Path
+import sys
 import base64
 import urllib.parse
 
@@ -114,31 +115,62 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-# ================= TABELA DE SIMULAÇÕES (VISUAL IGUAL AO RESULTADOS.PY) =================
-st.markdown("""
-<div class="tabela-container">
-<table class="tabela">
-    <thead>
-        <tr>
-            <th>ID</th>
-            <th>NOME</th>
-            <th>MAPA</th>
-            <th>ALGORITMO</th>
-            <th>SIMULADO</th>
-        </tr>
-    </thead>
-    <tbody>
-        <tr>
-            <td>1</td>
-            <td>capacidade_maxima</td>
-            <td>{}</td>
-            <td>NSGA-II</td>
-            <td>SIM</td>
-        </tr>
-    </tbody>
-</table>
+# ================= TABELA DE SIMULAÇÕES (REAL) =================
+sys.path.append(str(Path(__file__).parent.parent))
+from services.simulator_integration import DatabaseIntegration
+
+db = DatabaseIntegration()
+simulations = []
+if mapa_nome:
+    try:
+        simulations = db.get_simulations_by_map(mapa_nome)
+    except Exception:
+        simulations = []
+
+if simulations:
+    rows_html = "".join([
+        f"<tr>"
+        f"<td>{sim['id']}</td>"
+        f"<td>{sim['nome']}</td>"
+        f"<td>{sim['mapa']}</td>"
+        f"<td>{sim['algoritmo']}</td>"
+        f"<td>{sim['simulado']}</td>"
+    f"<td><a href='./Simulação?sim_id={sim['id']}' class='botao' style='background:#2d7dff;padding:6px 10px;border-radius:6px;color:#fff;text-decoration:none;'>Ver</a></td>"
+        f"</tr>"
+        for sim in simulations
+    ])
+
+    table_html = f"""
+    <div class="tabela-container">
+        <table class="tabela">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>NOME</th>
+                    <th>MAPA</th>
+                    <th>ALGORITMO</th>
+                    <th>SIMULADO</th>
+                    <th>AÇÕES</th>
+                </tr>
+            </thead>
+            <tbody>
+                {rows_html}
+            </tbody>
+        </table>
+    </div>
+    """
+    st.markdown(table_html, unsafe_allow_html=True)
+else:
+    st.info("Nenhuma simulação registrada para este mapa.")
+
+# Botões de ação: Nova Simulação (pre-seleciona mapa)
+nova_sim_url = f"./Simulação?mapa={urllib.parse.quote(mapa_nome)}" if mapa_nome else "./Simulação"
+st.markdown(f"""
+<div style='display:flex; gap:12px; justify-content:center; margin-top:18px;'>
+    <a href="{nova_sim_url}" class="botao">+ Nova Simulação</a>
+    <a href="./Mapas" class="botao" style='background:#333;'>Voltar</a>
 </div>
-""".format(mapa_nome if mapa_nome else "—"), unsafe_allow_html=True)
+""", unsafe_allow_html=True)
 
 st.markdown("<br><br>", unsafe_allow_html=True)
 st.stop()

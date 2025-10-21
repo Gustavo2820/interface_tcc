@@ -104,7 +104,8 @@ if mapas:
             img_b64 = base64.b64encode(data).decode("utf-8")
             mapa_nome = mapa.stem
             mapa_nome_url = urllib.parse.quote_plus(mapa_nome)
-            href = f"/?page=Detalhes&mapa={mapa_nome_url}"
+            # Use a relative page link so Streamlit opens the Detalhes page for this map
+            href = f"./Detalhes?mapa={mapa_nome_url}"
 
             st.markdown(
                 f'''

@@ -1,0 +1,373 @@
+NSGA objective index mappings discovered (from result[i].obj[..] usages):
+
+File: simulador_heuristica/unified/sim_ca_main3.py
+  Line 48: obj[0] -> 'qtd_doors'    // snippet: 'qtd_doors': result[i].obj[0],
+  Line 48: obj[0] -> 'qtd_doors'    // snippet: 'qtd_doors': result[i].obj[0],
+  Line 49: obj[1] -> 'iterations'    // snippet: 'iterations': result[i].obj[1],
+  Line 49: obj[1] -> 'iterations'    // snippet: 'iterations': result[i].obj[1],
+  Line 49: obj[1] -> 'iterations'    // snippet: 'iterations': result[i].obj[1],
+  Line 50: obj[2] -> 'distance'    // snippet: 'distance': result[i].obj[2],
+  Line 50: obj[2] -> 'distance'    // snippet: 'distance': result[i].obj[2],
+  Line 50: obj[2] -> 'distance'    // snippet: 'distance': result[i].obj[2],
+  Line 50: obj[2] -> 'distance'    // snippet: 'distance': result[i].obj[2],
+
+File: simulador_heuristica/unified/sim_ca_main4.py
+  Line 35: obj[0] -> 'qtd_doors'    // snippet: 'qtd_doors': result[i].obj[0],
+  Line 35: obj[0] -> 'qtd_doors'    // snippet: 'qtd_doors': result[i].obj[0],
+  Line 36: obj[1] -> 'iterations'    // snippet: 'iterations': result[i].obj[1],
+  Line 36: obj[1] -> 'iterations'    // snippet: 'iterations': result[i].obj[1],
+  Line 36: obj[1] -> 'iterations'    // snippet: 'iterations': result[i].obj[1],
+  Line 37: obj[2] -> 'distance'    // snippet: 'distance': result[i].obj[2],
+  Line 37: obj[2] -> 'distance'    // snippet: 'distance': result[i].obj[2],
+  Line 37: obj[2] -> 'distance'    // snippet: 'distance': result[i].obj[2],
+  Line 37: obj[2] -> 'distance'    // snippet: 'distance': result[i].obj[2],
+
+File: simulador_heuristica/unified3/sim_ca_main3.py
+  Line 49: obj[0] -> 'qtd_doors'    // snippet: 'qtd_doors': result[i].obj[0],
+  Line 49: obj[0] -> 'qtd_doors'    // snippet: 'qtd_doors': result[i].obj[0],
+  Line 50: obj[1] -> 'iterations'    // snippet: 'iterations': result[i].obj[1],
+  Line 50: obj[1] -> 'iterations'    // snippet: 'iterations': result[i].obj[1],
+  Line 50: obj[1] -> 'iterations'    // snippet: 'iterations': result[i].obj[1],
+  Line 51: obj[2] -> 'distance'    // snippet: 'distance': result[i].obj[2],
+  Line 51: obj[2] -> 'distance'    // snippet: 'distance': result[i].obj[2],
+  Line 51: obj[2] -> 'distance'    // snippet: 'distance': result[i].obj[2],
+  Line 51: obj[2] -> 'distance'    // snippet: 'distance': result[i].obj[2],
+
+File: simulador_heuristica/unified3/sim_ca_main4.py
+  Line 35: obj[0] -> 'qtd_doors'    // snippet: 'qtd_doors': result[i].obj[0],
+  Line 35: obj[0] -> 'qtd_doors'    // snippet: 'qtd_doors': result[i].obj[0],
+  Line 36: obj[1] -> 'iterations'    // snippet: 'iterations': result[i].obj[1],
+  Line 36: obj[1] -> 'iterations'    // snippet: 'iterations': result[i].obj[1],
+  Line 36: obj[1] -> 'iterations'    // snippet: 'iterations': result[i].obj[1],
+  Line 37: obj[2] -> 'distance'    // snippet: 'distance': result[i].obj[2],
+  Line 37: obj[2] -> 'distance'    // snippet: 'distance': result[i].obj[2],
+  Line 37: obj[2] -> 'distance'    // snippet: 'distance': result[i].obj[2],
+  Line 37: obj[2] -> 'distance'    // snippet: 'distance': result[i].obj[2],
+
+File: simulador_heuristica/unified4/sim_ca_main3.py
+  Line 49: obj[0] -> 'qtd_doors'    // snippet: 'qtd_doors': result[i].obj[0],
+  Line 49: obj[0] -> 'qtd_doors'    // snippet: 'qtd_doors': result[i].obj[0],
+  Line 50: obj[1] -> 'iterations'    // snippet: 'iterations': result[i].obj[1],
+  Line 50: obj[1] -> 'iterations'    // snippet: 'iterations': result[i].obj[1],
+  Line 50: obj[1] -> 'iterations'    // snippet: 'iterations': result[i].obj[1],
+  Line 51: obj[2] -> 'distance'    // snippet: 'distance': result[i].obj[2],
+  Line 51: obj[2] -> 'distance'    // snippet: 'distance': result[i].obj[2],
+  Line 51: obj[2] -> 'distance'    // snippet: 'distance': result[i].obj[2],
+  Line 51: obj[2] -> 'distance'    // snippet: 'distance': result[i].obj[2],
+
+File: simulador_heuristica/unified4/sim_ca_main6.py
+  Line 49: obj[0] -> 'qtd_doors'    // snippet: 'qtd_doors': result[i].obj[0],
+  Line 49: obj[0] -> 'qtd_doors'    // snippet: 'qtd_doors': result[i].obj[0],
+  Line 50: obj[1] -> 'iterations'    // snippet: 'iterations': result[i].obj[1],
+  Line 50: obj[1] -> 'iterations'    // snippet: 'iterations': result[i].obj[1],
+  Line 50: obj[1] -> 'iterations'    // snippet: 'iterations': result[i].obj[1],
+  Line 51: obj[2] -> 'distance'    // snippet: 'distance': result[i].obj[2],
+  Line 51: obj[2] -> 'distance'    // snippet: 'distance': result[i].obj[2],
+  Line 51: obj[2] -> 'distance'    // snippet: 'distance': result[i].obj[2],
+  Line 51: obj[2] -> 'distance'    // snippet: 'distance': result[i].obj[2],
+
+File: simulador_heuristica/unified4/zz_sim_ca_main6.py
+  Line 54: obj[0] -> 'qtd_doors'    // snippet: 'qtd_doors': result[i].obj[0],
+  Line 54: obj[0] -> 'qtd_doors'    // snippet: 'qtd_doors': result[i].obj[0],
+  Line 55: obj[1] -> 'iterations'    // snippet: 'iterations': result[i].obj[1],
+  Line 55: obj[1] -> 'iterations'    // snippet: 'iterations': result[i].obj[1],
+  Line 55: obj[1] -> 'iterations'    // snippet: 'iterations': result[i].obj[1],
+  Line 56: obj[2] -> 'distance'    // snippet: 'distance': result[i].obj[2],
+  Line 56: obj[2] -> 'distance'    // snippet: 'distance': result[i].obj[2],
+  Line 56: obj[2] -> 'distance'    // snippet: 'distance': result[i].obj[2],
+  Line 56: obj[2] -> 'distance'    // snippet: 'distance': result[i].obj[2],
+
+File: simulador_heuristica/unified_audition/sim_ca_main3.py
+  Line 49: obj[0] -> 'qtd_doors'    // snippet: 'qtd_doors': result[i].obj[0],
+  Line 49: obj[0] -> 'qtd_doors'    // snippet: 'qtd_doors': result[i].obj[0],
+  Line 50: obj[1] -> 'iterations'    // snippet: 'iterations': result[i].obj[1],
+  Line 50: obj[1] -> 'iterations'    // snippet: 'iterations': result[i].obj[1],
+  Line 50: obj[1] -> 'iterations'    // snippet: 'iterations': result[i].obj[1],
+  Line 51: obj[2] -> 'distance'    // snippet: 'distance': result[i].obj[2],
+  Line 51: obj[2] -> 'distance'    // snippet: 'distance': result[i].obj[2],
+  Line 51: obj[2] -> 'distance'    // snippet: 'distance': result[i].obj[2],
+  Line 51: obj[2] -> 'distance'    // snippet: 'distance': result[i].obj[2],
+
+File: simulador_heuristica/unified_audition/sim_ca_main6.py
+  Line 49: obj[0] -> 'qtd_doors'    // snippet: 'qtd_doors': result[i].obj[0],
+  Line 49: obj[0] -> 'qtd_doors'    // snippet: 'qtd_doors': result[i].obj[0],
+  Line 50: obj[1] -> 'iterations'    // snippet: 'iterations': result[i].obj[1],
+  Line 50: obj[1] -> 'iterations'    // snippet: 'iterations': result[i].obj[1],
+  Line 50: obj[1] -> 'iterations'    // snippet: 'iterations': result[i].obj[1],
+  Line 51: obj[2] -> 'distance'    // snippet: 'distance': result[i].obj[2],
+  Line 51: obj[2] -> 'distance'    // snippet: 'distance': result[i].obj[2],
+  Line 51: obj[2] -> 'distance'    // snippet: 'distance': result[i].obj[2],
+  Line 51: obj[2] -> 'distance'    // snippet: 'distance': result[i].obj[2],
+
+File: simulador_heuristica/unified_audition/zz_sim_ca_main6.py
+  Line 54: obj[0] -> 'qtd_doors'    // snippet: 'qtd_doors': result[i].obj[0],
+  Line 54: obj[0] -> 'qtd_doors'    // snippet: 'qtd_doors': result[i].obj[0],
+  Line 55: obj[1] -> 'iterations'    // snippet: 'iterations': result[i].obj[1],
+  Line 55: obj[1] -> 'iterations'    // snippet: 'iterations': result[i].obj[1],
+  Line 55: obj[1] -> 'iterations'    // snippet: 'iterations': result[i].obj[1],
+
+File: simulador_heuristica/unified_balada/sim_ca_main3.py
+  Line 49: obj[0] -> 'qtd_doors'    // snippet: 'qtd_doors': result[i].obj[0],
+  Line 49: obj[0] -> 'qtd_doors'    // snippet: 'qtd_doors': result[i].obj[0],
+  Line 50: obj[1] -> 'iterations'    // snippet: 'iterations': result[i].obj[1],
+  Line 50: obj[1] -> 'iterations'    // snippet: 'iterations': result[i].obj[1],
+  Line 50: obj[1] -> 'iterations'    // snippet: 'iterations': result[i].obj[1],
+  Line 51: obj[2] -> 'distance'    // snippet: 'distance': result[i].obj[2],
+  Line 51: obj[2] -> 'distance'    // snippet: 'distance': result[i].obj[2],
+  Line 51: obj[2] -> 'distance'    // snippet: 'distance': result[i].obj[2],
+  Line 51: obj[2] -> 'distance'    // snippet: 'distance': result[i].obj[2],
+
+File: simulador_heuristica/unified_balada/sim_ca_main6.py
+  Line 49: obj[0] -> 'qtd_doors'    // snippet: 'qtd_doors': result[i].obj[0],
+  Line 49: obj[0] -> 'qtd_doors'    // snippet: 'qtd_doors': result[i].obj[0],
+  Line 50: obj[1] -> 'iterations'    // snippet: 'iterations': result[i].obj[1],
+  Line 50: obj[1] -> 'iterations'    // snippet: 'iterations': result[i].obj[1],
+  Line 50: obj[1] -> 'iterations'    // snippet: 'iterations': result[i].obj[1],
+  Line 51: obj[2] -> 'distance'    // snippet: 'distance': result[i].obj[2],
+  Line 51: obj[2] -> 'distance'    // snippet: 'distance': result[i].obj[2],
+  Line 51: obj[2] -> 'distance'    // snippet: 'distance': result[i].obj[2],
+  Line 51: obj[2] -> 'distance'    // snippet: 'distance': result[i].obj[2],
+
+File: simulador_heuristica/unified_balada/zz_sim_ca_main6.py
+  Line 54: obj[0] -> 'qtd_doors'    // snippet: 'qtd_doors': result[i].obj[0],
+  Line 54: obj[0] -> 'qtd_doors'    // snippet: 'qtd_doors': result[i].obj[0],
+  Line 55: obj[1] -> 'iterations'    // snippet: 'iterations': result[i].obj[1],
+  Line 55: obj[1] -> 'iterations'    // snippet: 'iterations': result[i].obj[1],
+  Line 55: obj[1] -> 'iterations'    // snippet: 'iterations': result[i].obj[1],
+
+
+Aggregated index -> names (across files):
+  index 0: names found = ['qtd_doors']
+    - qtd_doors: 26 occurrences (examples)
+       simulador_heuristica/unified/sim_ca_main3.py:48: 'qtd_doors': result[i].obj[0],
+       simulador_heuristica/unified/sim_ca_main3.py:48: 'qtd_doors': result[i].obj[0],
+       simulador_heuristica/unified/sim_ca_main4.py:35: 'qtd_doors': result[i].obj[0],
+  index 1: names found = ['iterations']
+    - iterations: 39 occurrences (examples)
+       simulador_heuristica/unified/sim_ca_main3.py:49: 'iterations': result[i].obj[1],
+       simulador_heuristica/unified/sim_ca_main3.py:49: 'iterations': result[i].obj[1],
+       simulador_heuristica/unified/sim_ca_main3.py:49: 'iterations': result[i].obj[1],
+  index 2: names found = ['distance']
+    - distance: 44 occurrences (examples)
+       simulador_heuristica/unified/sim_ca_main3.py:50: 'distance': result[i].obj[2],
+       simulador_heuristica/unified/sim_ca_main3.py:50: 'distance': result[i].obj[2],
+       simulador_heuristica/unified/sim_ca_main3.py:50: 'distance': result[i].obj[2],
+
+
+Return tuples that look like objective vectors (functions that return multiple metrics):
+
+File: simulador_heuristica/unified/h_brute_force.py
+  Line 98: return parts = ['len(doors)', 'soma', 'distance']    // snippet: return len(doors), soma, distance
+  Line 98: return parts = ['len(doors)', 'soma', 'distance']    // snippet: return len(doors), soma, distance
+
+File: simulador_heuristica/unified/mh_ga_factory.py
+  Line 86: return parts = ['len(doors)', 'soma', 'distance']    // snippet: return len(doors), soma, distance
+  Line 86: return parts = ['len(doors)', 'soma', 'distance']    // snippet: return len(doors), soma, distance
+  Line 137: return parts = ['Gene(child1)', 'Gene(child2)']    // snippet: return Gene(child1), Gene(child2)
+  Line 161: return parts = ['pool[0]', 'pool[1]']    // snippet: return pool[0], pool[1]
+
+File: simulador_heuristica/unified/mh_ga_selectors.py
+  Line 15: return parts = ['pool[0]', 'pool[1]']    // snippet: return pool[0], pool[1]
+
+File: simulador_heuristica/unified/mh_teste_nsga2.py
+  Line 57: return parts = ['len(doors)', 'avg_iters', 'avg_distance']    // snippet: return len(doors), avg_iters, avg_distance
+  Line 57: return parts = ['len(doors)', 'avg_iters', 'avg_distance']    // snippet: return len(doors), avg_iters, avg_distance
+
+File: simulador_heuristica/unified/sim_ca_simulator.py
+  Line 73: return parts = ['self.iteration', 'self.log.calculateDistances()']    // snippet: return self.iteration, self.log.calculateDistances()
+  Line 73: return parts = ['self.iteration', 'self.log.calculateDistances()']    // snippet: return self.iteration, self.log.calculateDistances()
+
+File: simulador_heuristica/unified/z_experiment1_audition.py
+  Line 56: return parts = ['len(doors)', 'avg_iters', 'avg_distance']    // snippet: return len(doors), avg_iters, avg_distance
+  Line 56: return parts = ['len(doors)', 'avg_iters', 'avg_distance']    // snippet: return len(doors), avg_iters, avg_distance
+
+File: simulador_heuristica/unified/z_experiment2_formatura.py
+  Line 52: return parts = ['len(doors)', 'avg_iters', 'avg_distance']    // snippet: return len(doors), avg_iters, avg_distance
+  Line 52: return parts = ['len(doors)', 'avg_iters', 'avg_distance']    // snippet: return len(doors), avg_iters, avg_distance
+
+File: simulador_heuristica/unified/z_experiment3_balad.py
+  Line 52: return parts = ['len(doors)', 'avg_iters', 'avg_distance']    // snippet: return len(doors), avg_iters, avg_distance
+  Line 52: return parts = ['len(doors)', 'avg_iters', 'avg_distance']    // snippet: return len(doors), avg_iters, avg_distance
+
+File: simulador_heuristica/unified/z_param_tuning.py
+  Line 56: return parts = ['len(doors)', 'avg_iters', 'avg_distance']    // snippet: return len(doors), avg_iters, avg_distance
+  Line 56: return parts = ['len(doors)', 'avg_iters', 'avg_distance']    // snippet: return len(doors), avg_iters, avg_distance
+
+File: simulador_heuristica/unified/z_param_tuning2.py
+  Line 56: return parts = ['len(doors)', 'avg_iters', 'avg_distance']    // snippet: return len(doors), avg_iters, avg_distance
+  Line 56: return parts = ['len(doors)', 'avg_iters', 'avg_distance']    // snippet: return len(doors), avg_iters, avg_distance
+
+File: simulador_heuristica/unified3/h_brute_force.py
+  Line 90: return parts = ['len(doors)', 'soma', 'distance']    // snippet: return len(doors), soma, distance
+  Line 90: return parts = ['len(doors)', 'soma', 'distance']    // snippet: return len(doors), soma, distance
+
+File: simulador_heuristica/unified3/mh_ga_factory.py
+  Line 56: return parts = ['len(doors)', 'soma', 'distance']    // snippet: return len(doors), soma, distance
+  Line 56: return parts = ['len(doors)', 'soma', 'distance']    // snippet: return len(doors), soma, distance
+  Line 100: return parts = ['Gene(child1)', 'Gene(child2)']    // snippet: return Gene(child1), Gene(child2)
+  Line 124: return parts = ['pool[0]', 'pool[1]']    // snippet: return pool[0], pool[1]
+
+File: simulador_heuristica/unified3/mh_ga_selectors.py
+  Line 15: return parts = ['pool[0]', 'pool[1]']    // snippet: return pool[0], pool[1]
+
+File: simulador_heuristica/unified3/mh_teste_nsga2.py
+  Line 57: return parts = ['len(doors)', 'avg_iters', 'avg_distance']    // snippet: return len(doors), avg_iters, avg_distance
+  Line 57: return parts = ['len(doors)', 'avg_iters', 'avg_distance']    // snippet: return len(doors), avg_iters, avg_distance
+
+File: simulador_heuristica/unified3/sim_ca_simulator.py
+  Line 73: return parts = ['self.iteration', 'self.log.calculateDistances()']    // snippet: return self.iteration, self.log.calculateDistances()
+  Line 73: return parts = ['self.iteration', 'self.log.calculateDistances()']    // snippet: return self.iteration, self.log.calculateDistances()
+
+File: simulador_heuristica/unified3/z_experiment1_audition.py
+  Line 53: return parts = ['len(doors)', 'avg_iters#', 'avg_distance']    // snippet: return len(doors), avg_iters#, avg_distance
+  Line 53: return parts = ['len(doors)', 'avg_iters#', 'avg_distance']    // snippet: return len(doors), avg_iters#, avg_distance
+
+File: simulador_heuristica/unified3/z_experiment2_formatura.py
+  Line 53: return parts = ['len(doors)', 'avg_iters#', 'avg_distance']    // snippet: return len(doors), avg_iters#, avg_distance
+  Line 53: return parts = ['len(doors)', 'avg_iters#', 'avg_distance']    // snippet: return len(doors), avg_iters#, avg_distance
+
+File: simulador_heuristica/unified3/z_experiment3_balad.py
+  Line 53: return parts = ['len(doors)', 'avg_iters#', 'avg_distance']    // snippet: return len(doors), avg_iters#, avg_distance
+  Line 53: return parts = ['len(doors)', 'avg_iters#', 'avg_distance']    // snippet: return len(doors), avg_iters#, avg_distance
+
+File: simulador_heuristica/unified3/z_param_tuning.py
+  Line 56: return parts = ['len(doors)', 'avg_iters', 'avg_distance']    // snippet: return len(doors), avg_iters, avg_distance
+  Line 56: return parts = ['len(doors)', 'avg_iters', 'avg_distance']    // snippet: return len(doors), avg_iters, avg_distance
+
+File: simulador_heuristica/unified3/z_param_tuning2.py
+  Line 56: return parts = ['len(doors)', 'avg_iters', 'avg_distance']    // snippet: return len(doors), avg_iters, avg_distance
+  Line 56: return parts = ['len(doors)', 'avg_iters', 'avg_distance']    // snippet: return len(doors), avg_iters, avg_distance
+
+File: simulador_heuristica/unified4/h_brute_force.py
+  Line 91: return parts = ['len(doors)', 'soma', 'distance']    // snippet: return len(doors), soma, distance
+  Line 91: return parts = ['len(doors)', 'soma', 'distance']    // snippet: return len(doors), soma, distance
+
+File: simulador_heuristica/unified4/mh_ga_factory.py
+  Line 55: return parts = ['len(doors)', 'soma', 'distance']    // snippet: return len(doors), soma, distance
+  Line 55: return parts = ['len(doors)', 'soma', 'distance']    // snippet: return len(doors), soma, distance
+  Line 99: return parts = ['Gene(child1)', 'Gene(child2)']    // snippet: return Gene(child1), Gene(child2)
+  Line 123: return parts = ['pool[0]', 'pool[1]']    // snippet: return pool[0], pool[1]
+
+File: simulador_heuristica/unified4/mh_ga_selectors.py
+  Line 15: return parts = ['pool[0]', 'pool[1]']    // snippet: return pool[0], pool[1]
+
+File: simulador_heuristica/unified4/mh_teste_nsga2.py
+  Line 57: return parts = ['len(doors)', 'avg_iters', 'avg_distance']    // snippet: return len(doors), avg_iters, avg_distance
+  Line 57: return parts = ['len(doors)', 'avg_iters', 'avg_distance']    // snippet: return len(doors), avg_iters, avg_distance
+
+File: simulador_heuristica/unified4/sim_ca_simulator.py
+  Line 73: return parts = ['self.iteration', 'self.log.calculateDistances()']    // snippet: return self.iteration, self.log.calculateDistances()
+  Line 73: return parts = ['self.iteration', 'self.log.calculateDistances()']    // snippet: return self.iteration, self.log.calculateDistances()
+
+File: simulador_heuristica/unified4/z_experiment1_audition.py
+  Line 52: return parts = ['len(doors)', 'avg_iters', 'avg_distance']    // snippet: return len(doors), avg_iters, avg_distance
+  Line 52: return parts = ['len(doors)', 'avg_iters', 'avg_distance']    // snippet: return len(doors), avg_iters, avg_distance
+
+File: simulador_heuristica/unified4/z_experiment3_balad.py
+  Line 52: return parts = ['len(doors)', 'avg_iters', 'avg_distance']    // snippet: return len(doors), avg_iters, avg_distance
+  Line 52: return parts = ['len(doors)', 'avg_iters', 'avg_distance']    // snippet: return len(doors), avg_iters, avg_distance
+
+File: simulador_heuristica/unified4/z_param_tuning.py
+  Line 56: return parts = ['len(doors)', 'avg_iters', 'avg_distance']    // snippet: return len(doors), avg_iters, avg_distance
+  Line 56: return parts = ['len(doors)', 'avg_iters', 'avg_distance']    // snippet: return len(doors), avg_iters, avg_distance
+
+File: simulador_heuristica/unified4/z_param_tuning2.py
+  Line 56: return parts = ['len(doors)', 'avg_iters', 'avg_distance']    // snippet: return len(doors), avg_iters, avg_distance
+  Line 56: return parts = ['len(doors)', 'avg_iters', 'avg_distance']    // snippet: return len(doors), avg_iters, avg_distance
+
+File: simulador_heuristica/unified4/zz_experiment2_cult.py
+  Line 52: return parts = ['len(doors)', 'avg_iters', 'avg_distance']    // snippet: return len(doors), avg_iters, avg_distance
+  Line 52: return parts = ['len(doors)', 'avg_iters', 'avg_distance']    // snippet: return len(doors), avg_iters, avg_distance
+
+File: simulador_heuristica/unified_audition/h_brute_force.py
+  Line 87: return parts = ['len(doors)', 'soma#', 'distance']    // snippet: return len(doors), soma#, distance
+  Line 87: return parts = ['len(doors)', 'soma#', 'distance']    // snippet: return len(doors), soma#, distance
+
+File: simulador_heuristica/unified_audition/mh_ga_factory.py
+  Line 55: return parts = ['len(doors)', 'soma#', 'distance']    // snippet: return len(doors), soma#, distance
+  Line 55: return parts = ['len(doors)', 'soma#', 'distance']    // snippet: return len(doors), soma#, distance
+  Line 99: return parts = ['Gene(child1)', 'Gene(child2)']    // snippet: return Gene(child1), Gene(child2)
+  Line 123: return parts = ['pool[0]', 'pool[1]']    // snippet: return pool[0], pool[1]
+
+File: simulador_heuristica/unified_audition/mh_ga_selectors.py
+  Line 15: return parts = ['pool[0]', 'pool[1]']    // snippet: return pool[0], pool[1]
+
+File: simulador_heuristica/unified_audition/mh_teste_nsga2.py
+  Line 57: return parts = ['len(doors)', 'avg_iters', 'avg_distance']    // snippet: return len(doors), avg_iters, avg_distance
+  Line 57: return parts = ['len(doors)', 'avg_iters', 'avg_distance']    // snippet: return len(doors), avg_iters, avg_distance
+
+File: simulador_heuristica/unified_audition/sim_ca_simulator.py
+  Line 73: return parts = ['self.iteration', 'self.log.calculateDistances()']    // snippet: return self.iteration, self.log.calculateDistances()
+  Line 73: return parts = ['self.iteration', 'self.log.calculateDistances()']    // snippet: return self.iteration, self.log.calculateDistances()
+
+File: simulador_heuristica/unified_audition/z_experiment1_audition.py
+  Line 52: return parts = ['len(doors)', 'avg_iters', 'avg_distance']    // snippet: return len(doors), avg_iters, avg_distance
+  Line 52: return parts = ['len(doors)', 'avg_iters', 'avg_distance']    // snippet: return len(doors), avg_iters, avg_distance
+
+File: simulador_heuristica/unified_audition/z_experiment3_balad.py
+  Line 52: return parts = ['len(doors)', 'avg_iters', 'avg_distance']    // snippet: return len(doors), avg_iters, avg_distance
+  Line 52: return parts = ['len(doors)', 'avg_iters', 'avg_distance']    // snippet: return len(doors), avg_iters, avg_distance
+
+File: simulador_heuristica/unified_audition/z_param_tuning.py
+  Line 56: return parts = ['len(doors)', 'avg_iters', 'avg_distance']    // snippet: return len(doors), avg_iters, avg_distance
+  Line 56: return parts = ['len(doors)', 'avg_iters', 'avg_distance']    // snippet: return len(doors), avg_iters, avg_distance
+
+File: simulador_heuristica/unified_audition/z_param_tuning2.py
+  Line 56: return parts = ['len(doors)', 'avg_iters', 'avg_distance']    // snippet: return len(doors), avg_iters, avg_distance
+  Line 56: return parts = ['len(doors)', 'avg_iters', 'avg_distance']    // snippet: return len(doors), avg_iters, avg_distance
+
+File: simulador_heuristica/unified_audition/zz_experiment2_audition.py
+  Line 58: return parts = ['len(doors)', 'soma#', 'distance']    // snippet: return len(doors), soma#, distance
+  Line 58: return parts = ['len(doors)', 'soma#', 'distance']    // snippet: return len(doors), soma#, distance
+
+File: simulador_heuristica/unified_balada/h_brute_force.py
+  Line 87: return parts = ['len(doors)', 'soma#', 'distance']    // snippet: return len(doors), soma#, distance
+  Line 87: return parts = ['len(doors)', 'soma#', 'distance']    // snippet: return len(doors), soma#, distance
+
+File: simulador_heuristica/unified_balada/mh_ga_factory.py
+  Line 55: return parts = ['len(doors)', 'soma#', 'distance']    // snippet: return len(doors), soma#, distance
+  Line 55: return parts = ['len(doors)', 'soma#', 'distance']    // snippet: return len(doors), soma#, distance
+  Line 99: return parts = ['Gene(child1)', 'Gene(child2)']    // snippet: return Gene(child1), Gene(child2)
+  Line 123: return parts = ['pool[0]', 'pool[1]']    // snippet: return pool[0], pool[1]
+
+File: simulador_heuristica/unified_balada/mh_ga_selectors.py
+  Line 15: return parts = ['pool[0]', 'pool[1]']    // snippet: return pool[0], pool[1]
+
+File: simulador_heuristica/unified_balada/mh_teste_nsga2.py
+  Line 57: return parts = ['len(doors)', 'avg_iters', 'avg_distance']    // snippet: return len(doors), avg_iters, avg_distance
+  Line 57: return parts = ['len(doors)', 'avg_iters', 'avg_distance']    // snippet: return len(doors), avg_iters, avg_distance
+
+File: simulador_heuristica/unified_balada/sim_ca_simulator.py
+  Line 73: return parts = ['self.iteration', 'self.log.calculateDistances()']    // snippet: return self.iteration, self.log.calculateDistances()
+  Line 73: return parts = ['self.iteration', 'self.log.calculateDistances()']    // snippet: return self.iteration, self.log.calculateDistances()
+
+File: simulador_heuristica/unified_balada/z_experiment1_audition.py
+  Line 52: return parts = ['len(doors)', 'avg_iters', 'avg_distance']    // snippet: return len(doors), avg_iters, avg_distance
+  Line 52: return parts = ['len(doors)', 'avg_iters', 'avg_distance']    // snippet: return len(doors), avg_iters, avg_distance
+
+File: simulador_heuristica/unified_balada/z_experiment3_balad.py
+  Line 52: return parts = ['len(doors)', 'avg_iters', 'avg_distance']    // snippet: return len(doors), avg_iters, avg_distance
+  Line 52: return parts = ['len(doors)', 'avg_iters', 'avg_distance']    // snippet: return len(doors), avg_iters, avg_distance
+
+File: simulador_heuristica/unified_balada/z_param_tuning.py
+  Line 56: return parts = ['len(doors)', 'avg_iters', 'avg_distance']    // snippet: return len(doors), avg_iters, avg_distance
+  Line 56: return parts = ['len(doors)', 'avg_iters', 'avg_distance']    // snippet: return len(doors), avg_iters, avg_distance
+
+File: simulador_heuristica/unified_balada/z_param_tuning2.py
+  Line 56: return parts = ['len(doors)', 'avg_iters', 'avg_distance']    // snippet: return len(doors), avg_iters, avg_distance
+  Line 56: return parts = ['len(doors)', 'avg_iters', 'avg_distance']    // snippet: return len(doors), avg_iters, avg_distance
+
+File: simulador_heuristica/unified_balada/zz_experiment2_balada.py
+  Line 58: return parts = ['len(doors)', 'soma#', 'distance']    // snippet: return len(doors), soma#, distance
+  Line 58: return parts = ['len(doors)', 'soma#', 'distance']    // snippet: return len(doors), soma#, distance
+
+
+Conclusions / classification:
+  - Many unified* scripts produce objective vectors where:
+    index0 names sample: ['qtd_doors']
+    index1 names sample: ['iterations']
+    index2 names sample: ['distance']
+  - From return statements and obj usage, the typical objective vector is:
+      [num_doors, iterations_or_avg_iters, distance]
+    where "iterations_or_avg_iters" is an iteration count (not wall-clock time).
+  - There is little evidence of an explicit wall-clock "tempo_total" objective in unified*; iterations were used instead as the time-like metric.

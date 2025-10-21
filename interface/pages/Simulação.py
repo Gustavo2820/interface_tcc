@@ -19,6 +19,28 @@ for key in ['run_sim', 'view_results', 'last_results', 'last_experiment', 'indiv
         st.session_state[key] = False if 'run' in key or 'view' in key else None
 st.session_state.individuals_textarea = st.session_state.individuals_textarea or "[]"
 
+# Session state for label-based individuals editor
+if 'ind_labels' not in st.session_state:
+    st.session_state.ind_labels = []  # list of characterization dicts
+if 'label_edit_index' not in st.session_state:
+    st.session_state.label_edit_index = -1
+
+def _reset_label_tmp():
+    st.session_state.tmp_label_name = ""
+    st.session_state.tmp_amount = 1
+    st.session_state.tmp_r = 255
+    st.session_state.tmp_g = 0
+    st.session_state.tmp_b = 0
+    st.session_state.tmp_speed = 1
+    st.session_state.tmp_KD = 1.0
+    st.session_state.tmp_KS = 1.0
+    st.session_state.tmp_KW = 1.0
+    st.session_state.tmp_KI = 0.5
+
+# initialize tmp fields if not present
+if 'tmp_label_name' not in st.session_state:
+    _reset_label_tmp()
+
 # Adiciona diretórios necessários ao sys.path
 services_dir = str(Path(__file__).parent.parent)
 if services_dir not in sys.path:
@@ -48,6 +70,80 @@ if 'nsga_integration' not in st.session_state:
 mapas_dir = Path("mapas")
 mapas_dir.mkdir(exist_ok=True)
 map_options = sorted([p.stem for p in mapas_dir.glob("*.png")])
+# Prefill defaults (will be overridden if query params or existing simulation present)
+prefill_simulation_name = "sim_default"
+algorithms_list = ["Simulação Direta","Algoritmo Genético","NSGA-II","Força Bruta"]
+prefill_algorithm = algorithms_list[0]
+prefill_mapa = None
+
+# ================= QUERY PARAMS: pre-load mapa or simulation =================
+params = st.query_params
+preselected_map = None
+preselected_sim_id = None
+if params:
+    if 'mapa' in params:
+        v = params.get('mapa')
+        if isinstance(v, list):
+            v = v[0]
+        if v and v in map_options:
+            preselected_map = v
+    if 'sim_id' in params:
+        try:
+            sid = params.get('sim_id')
+            if isinstance(sid, list):
+                sid = sid[0]
+            preselected_sim_id = int(sid) if sid else None
+        except Exception:
+            preselected_sim_id = None
+
+db = DatabaseIntegration()
+
+# If editing an existing simulation, load its data
+existing_sim = None
+if preselected_sim_id is not None:
+    try:
+        existing_sim = db.get_simulation(preselected_sim_id)
+    except Exception:
+        existing_sim = None
+
+# If simulation exists, override prefill defaults and populate session state
+if existing_sim:
+    prefill_simulation_name = existing_sim.get('nome', prefill_simulation_name)
+    # Map stored algorithm values may match one of algorithms_list; otherwise keep default
+    prefill_algorithm = existing_sim.get('algoritmo', prefill_algorithm)
+    prefill_mapa = existing_sim.get('mapa', prefill_mapa)
+    # populate session_state with saved individuals/config so UI fields show them
+    try:
+        cfg_ped = existing_sim.get('config_pedestres_json')
+        if cfg_ped:
+            # store as pretty JSON string
+            try:
+                parsed = json.loads(cfg_ped)
+                st.session_state.individuals_textarea = json.dumps(parsed, indent=2)
+            except Exception:
+                st.session_state.individuals_textarea = cfg_ped
+    except Exception:
+        pass
+    # If NSGA config is present, try to load it into nsga_integration
+    try:
+        nsga_cfg = existing_sim.get('nsga_config_json')
+        if nsga_cfg and hasattr(st.session_state, 'nsga_integration'):
+            # attempt to write a temp file and let the integration load it if it provides a loader
+            try:
+                tmp = Path('temp_simulation')
+                tmp.mkdir(exist_ok=True)
+                fpath = tmp / f'nsga_config_sim_{existing_sim.get("id", "tmp")}.json'
+                fpath.write_text(nsga_cfg)
+                st.session_state.nsga_integration.load_configuration(fpath)
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+else:
+    # If a map was preselected from query params, set it
+    if preselected_map:
+        prefill_mapa = preselected_map
 
 # ================= FUNÇÕES =================
 def start_simulation():
@@ -98,9 +194,17 @@ with col_btn3:
 # ================= FORMULÁRIO PRINCIPAL =================
 col1, col2 = st.columns([1,3])
 with col1:
-    simulation_name = st.text_input("Nome da Simulação", value="sim_default")
-    algorithm = st.selectbox("Algoritmo", ["Simulação Direta","Algoritmo Genético","NSGA-II","Força Bruta"])
-    selected_map = st.selectbox("Mapa", options=["(selecione)"] + map_options)
+    simulation_name = st.text_input("Nome da Simulação", value=prefill_simulation_name)
+    algorithm = st.selectbox("Algoritmo", algorithms_list, index=algorithms_list.index(prefill_algorithm) if prefill_algorithm in algorithms_list else 0)
+    # Determine default index for map selectbox
+    map_options_with_placeholder = ["(selecione)"] + map_options
+    default_map_index = 0
+    if prefill_mapa and prefill_mapa in map_options:
+        try:
+            default_map_index = map_options_with_placeholder.index(prefill_mapa)
+        except Exception:
+            default_map_index = 0
+    selected_map = st.selectbox("Mapa", options=map_options_with_placeholder, index=default_map_index)
     mapa_nome = selected_map if selected_map != "(selecione)" else None
 
     # Upload de configuração unificada
@@ -233,6 +337,275 @@ with col1:
             st.success("Indivíduos carregados!")
         except Exception as e:
             st.error(f"Erro ao carregar indivíduos: {e}")
+
+    # ===== Label-based Individuals Editor =====
+    with st.expander("Tipos de Indivíduos (Labels)"):
+        st.markdown("Use este editor para criar tipos (labels) de indivíduos. Depois clique em Exportar para gerar o JSON unificado.")
+        c1, c2 = st.columns([2,1])
+        with c1:
+            st.text_input("Nome do label", key='tmp_label_name')
+            st.number_input("Quantidade (amount)", min_value=0, value=st.session_state.get('tmp_amount',1), key='tmp_amount')
+            cr, cg, cb = st.columns(3)
+            with cr:
+                st.number_input("R", min_value=0, max_value=255, value=st.session_state.get('tmp_r',255), key='tmp_r')
+            with cg:
+                st.number_input("G", min_value=0, max_value=255, value=st.session_state.get('tmp_g',0), key='tmp_g')
+            with cb:
+                st.number_input("B", min_value=0, max_value=255, value=st.session_state.get('tmp_b',0), key='tmp_b')
+            st.number_input("Velocidade (speed)", min_value=1, value=st.session_state.get('tmp_speed',1), key='tmp_speed')
+        with c2:
+            st.number_input("KD", min_value=0.0, value=float(st.session_state.get('tmp_KD',1.0)), step=0.1, key='tmp_KD')
+            st.number_input("KS", min_value=0.0, value=float(st.session_state.get('tmp_KS',1.0)), step=0.1, key='tmp_KS')
+            st.number_input("KW", min_value=0.0, value=float(st.session_state.get('tmp_KW',1.0)), step=0.1, key='tmp_KW')
+            st.number_input("KI", min_value=0.0, value=float(st.session_state.get('tmp_KI',0.5)), step=0.1, key='tmp_KI')
+
+        add_col, list_col = st.columns([1,2])
+        with add_col:
+            if st.button("Adicionar / Atualizar Label"):
+                label = {
+                    "label": st.session_state.tmp_label_name or "Individuo",
+                    "amount": int(st.session_state.tmp_amount),
+                    "red": int(st.session_state.tmp_r),
+                    "green": int(st.session_state.tmp_g),
+                    "blue": int(st.session_state.tmp_b),
+                    "speed": int(st.session_state.tmp_speed),
+                    "KD": float(st.session_state.tmp_KD),
+                    "KS": float(st.session_state.tmp_KS),
+                    "KW": float(st.session_state.tmp_KW),
+                    "KI": float(st.session_state.tmp_KI)
+                }
+                idx = st.session_state.label_edit_index
+                if idx is not None and idx >= 0 and idx < len(st.session_state.ind_labels):
+                    st.session_state.ind_labels[idx] = label
+                    st.session_state.label_edit_index = -1
+                    st.success("Label atualizado.")
+                else:
+                    st.session_state.ind_labels.append(label)
+                    st.success("Label adicionado.")
+                _reset_label_tmp()
+        with list_col:
+            st.markdown("#### Labels criados")
+            for i, lab in enumerate(st.session_state.ind_labels):
+                cols = st.columns([4,1,1])
+                with cols[0]:
+                    st.write(f"{lab['label']} — quantidade: {lab.get('amount',0)} — cor: ({lab.get('red')},{lab.get('green')},{lab.get('blue')})")
+                with cols[1]:
+                    if st.button("Editar", key=f"edit_{i}"):
+                        # populate tmp fields for editing
+                        st.session_state.tmp_label_name = lab.get('label','')
+                        st.session_state.tmp_amount = lab.get('amount',1)
+                        st.session_state.tmp_r = lab.get('red',255)
+                        st.session_state.tmp_g = lab.get('green',0)
+                        st.session_state.tmp_b = lab.get('blue',0)
+                        st.session_state.tmp_speed = lab.get('speed',1)
+                        st.session_state.tmp_KD = lab.get('KD',1.0)
+                        st.session_state.tmp_KS = lab.get('KS',1.0)
+                        st.session_state.tmp_KW = lab.get('KW',1.0)
+                        st.session_state.tmp_KI = lab.get('KI',0.5)
+                        st.session_state.label_edit_index = i
+                with cols[2]:
+                    if st.button("Remover", key=f"del_{i}"):
+                        st.session_state.ind_labels.pop(i)
+                        st.success("Label removido.")
+
+        # Import existing individuals_textarea if it follows the grouped 'caracterizations' schema
+        if st.button("Importar de JSON atual" ):
+            try:
+                parsed = json.loads(st.session_state.get('individuals_textarea','[]'))
+                if isinstance(parsed, dict) and 'caracterizations' in parsed:
+                    st.session_state.ind_labels = parsed.get('caracterizations', [])
+                    st.success("Labels importados do JSON atual.")
+                else:
+                    st.error("JSON atual não possui chave 'caracterizations'.")
+            except Exception as e:
+                st.error(f"Falha ao importar JSON: {e}")
+
+        # Export labels to temp_simulation/individuals.json (grouped format) and also to individuals.json expanded
+        if st.button("Exportar Labels para JSON"):
+            try:
+                tmp_dir = Path('temp_simulation')
+                tmp_dir.mkdir(exist_ok=True)
+                unified = {
+                    "description": st.session_state.get('description', f"Configuração para {simulation_name}"),
+                    "caracterizations": st.session_state.ind_labels
+                }
+                # Save grouped labels (caracterizations)
+                labels_path = tmp_dir / 'individuals_labels.json'
+                labels_path.write_text(json.dumps(unified, indent=2, ensure_ascii=False))
+
+                # Also generate an expanded individuals.json (list expanded by amount)
+                expanded = []
+                for lab in st.session_state.ind_labels:
+                    amt = int(lab.get('amount',1))
+                    for _ in range(amt):
+                        expanded.append({
+                            "label": lab.get('label','Individuo'),
+                            "color": [lab.get('red',255), lab.get('green',0), lab.get('blue',0)],
+                            "speed": int(lab.get('speed',1)),
+                            "KD": float(lab.get('KD',1.0)),
+                            "KS": float(lab.get('KS',1.0)),
+                            "KW": float(lab.get('KW',1.0)),
+                            "KI": float(lab.get('KI',0.5)),
+                            "row": 0,
+                            "col": 0
+                        })
+                expanded_path = tmp_dir / 'individuals.json'
+                expanded_path.write_text(json.dumps(expanded, indent=2, ensure_ascii=False))
+                # update textarea to reflect expanded JSON
+                st.session_state.individuals_textarea = expanded_path.read_text()
+                st.success(f"Labels exportados: {labels_path} and {expanded_path}")
+            except Exception as e:
+                st.error(f"Falha ao exportar labels: {e}")
+
+    # =================== LABELS (TIPOS DE INDIVÍDUOS) ===================
+    # session state for labels
+    if 'individual_labels' not in st.session_state:
+        st.session_state.individual_labels = []
+    if 'labels_description' not in st.session_state:
+        st.session_state.labels_description = f"Individuals of the {simulation_name} experiment"
+
+    st.markdown("---")
+    st.markdown("#### Editor de Tipos de Indivíduos (Labels)")
+    with st.expander("➕ Criar novo tipo de indivíduo", expanded=False):
+        with st.form("form_add_label"):
+            lbl_name = st.text_input("Nome do tipo", value="New Type")
+            amount = st.number_input("Quantidade (amount)", min_value=1, value=10)
+            c1, c2, c3 = st.columns(3)
+            with c1:
+                red = st.number_input("R", min_value=0, max_value=255, value=255)
+            with c2:
+                green = st.number_input("G", min_value=0, max_value=255, value=0)
+            with c3:
+                blue = st.number_input("B", min_value=0, max_value=255, value=0)
+            speed = st.number_input("Velocidade", min_value=1, value=1)
+            KD = st.number_input("KD", min_value=0.0, value=1.0, step=0.1)
+            KS = st.number_input("KS", min_value=0.0, value=1.0, step=0.1)
+            KW = st.number_input("KW", min_value=0.0, value=0.3, step=0.1)
+            KI = st.number_input("KI", min_value=0.0, value=1.0, step=0.1)
+            add_label = st.form_submit_button("Adicionar tipo")
+        if add_label:
+            new = {
+                "label": lbl_name,
+                "amount": int(amount),
+                "red": int(red),
+                "green": int(green),
+                "blue": int(blue),
+                "speed": int(speed),
+                "KD": float(KD),
+                "KS": float(KS),
+                "KW": float(KW),
+                "KI": float(KI)
+            }
+            st.session_state.individual_labels.append(new)
+            st.success(f"Tipo '{lbl_name}' adicionado")
+
+    # List and edit existing labels
+    if st.session_state.individual_labels:
+        st.markdown("**Tipos criados**")
+        for idx, lab in enumerate(list(st.session_state.individual_labels)):
+            with st.expander(f"{lab.get('label','Tipo')} (x{lab.get('amount',1)})", expanded=False):
+                col_a, col_b = st.columns([3,1])
+                with col_a:
+                    new_label = st.text_input(f"Nome {idx}", value=lab.get('label',''), key=f'label_edit_{idx}')
+                    new_amount = st.number_input(f"Quantidade {idx}", min_value=1, value=int(lab.get('amount',1)), key=f'amount_edit_{idx}')
+                    c1, c2, c3 = st.columns(3)
+                    with c1:
+                        new_r = st.number_input(f"R {idx}", min_value=0, max_value=255, value=int(lab.get('red',255)), key=f'r_edit_{idx}')
+                    with c2:
+                        new_g = st.number_input(f"G {idx}", min_value=0, max_value=255, value=int(lab.get('green',0)), key=f'g_edit_{idx}')
+                    with c3:
+                        new_b = st.number_input(f"B {idx}", min_value=0, max_value=255, value=int(lab.get('blue',0)), key=f'b_edit_{idx}')
+                    new_speed = st.number_input(f"Speed {idx}", min_value=1, value=int(lab.get('speed',1)), key=f'spd_edit_{idx}')
+                    new_KD = st.number_input(f"KD {idx}", min_value=0.0, value=float(lab.get('KD',1.0)), step=0.1, key=f'kd_edit_{idx}')
+                    new_KS = st.number_input(f"KS {idx}", min_value=0.0, value=float(lab.get('KS',1.0)), step=0.1, key=f'ks_edit_{idx}')
+                    new_KW = st.number_input(f"KW {idx}", min_value=0.0, value=float(lab.get('KW',0.3)), step=0.1, key=f'kw_edit_{idx}')
+                    new_KI = st.number_input(f"KI {idx}", min_value=0.0, value=float(lab.get('KI',1.0)), step=0.1, key=f'ki_edit_{idx}')
+                with col_b:
+                    if st.button("Salvar", key=f'save_label_{idx}'):
+                        st.session_state.individual_labels[idx] = {
+                            "label": new_label,
+                            "amount": int(new_amount),
+                            "red": int(new_r),
+                            "green": int(new_g),
+                            "blue": int(new_b),
+                            "speed": int(new_speed),
+                            "KD": float(new_KD),
+                            "KS": float(new_KS),
+                            "KW": float(new_KW),
+                            "KI": float(new_KI)
+                        }
+                        st.success("Tipo atualizado")
+                    if st.button("Remover", key=f'del_label_{idx}'):
+                        st.session_state.individual_labels.pop(idx)
+                        st.experimental_rerun()
+
+        # Description and export
+        st.text_input("Descrição (export)", value=st.session_state.labels_description, key='labels_description')
+        col_e1, col_e2 = st.columns([1,1])
+        with col_e1:
+            if st.button("📤 Exportar labels (grupo)"):
+                try:
+                    temp_dir = Path("temp_simulation")
+                    temp_dir.mkdir(exist_ok=True)
+                    # build grouped schema
+                    group = {
+                        "description": st.session_state.get('labels_description', f"Individuals of the {simulation_name} experiment"),
+                        "caracterizations": st.session_state.individual_labels
+                    }
+                    grp_path = temp_dir / "individuals_labels.json"
+                    grp_path.write_text(json.dumps(group, indent=2, ensure_ascii=False))
+
+                    # also build expanded individual list for simulator compatibility
+                    expanded = []
+                    for c in st.session_state.individual_labels:
+                        amt = int(c.get('amount', 1))
+                        for _ in range(amt):
+                            expanded.append({
+                                "label": c.get('label'),
+                                "color": [int(c.get('red',255)), int(c.get('green',0)), int(c.get('blue',0))],
+                                "speed": int(c.get('speed',1)),
+                                "KD": float(c.get('KD',1.0)),
+                                "KS": float(c.get('KS',1.0)),
+                                "KW": float(c.get('KW',0.3)),
+                                "KI": float(c.get('KI',1.0)),
+                                "row": 0,
+                                "col": 0
+                            })
+                    expanded_path = temp_dir / "individuals.json"
+                    expanded_path.write_text(json.dumps(expanded, indent=2, ensure_ascii=False))
+                    # update session textarea so existing editor reflects the expanded individuals
+                    st.session_state.individuals_textarea = json.dumps(expanded, indent=2, ensure_ascii=False)
+                    st.success(f"Labels exportados para: {grp_path} (grupo) e {expanded_path} (expandido)")
+                except Exception as e:
+                    st.error(f"Erro ao exportar labels: {e}")
+        with col_e2:
+            if st.button("🔁 Sincronizar para indivíduos (Salvar temporário) "):
+                try:
+                    temp_dir = Path("temp_simulation")
+                    temp_dir.mkdir(exist_ok=True)
+                    expanded = []
+                    for c in st.session_state.individual_labels:
+                        amt = int(c.get('amount',1))
+                        for _ in range(amt):
+                            expanded.append({
+                                "label": c.get('label'),
+                                "color": [int(c.get('red',255)), int(c.get('green',0)), int(c.get('blue',0))],
+                                "speed": int(c.get('speed',1)),
+                                "KD": float(c.get('KD',1.0)),
+                                "KS": float(c.get('KS',1.0)),
+                                "KW": float(c.get('KW',0.3)),
+                                "KI": float(c.get('KI',1.0)),
+                                "row": 0,
+                                "col": 0
+                            })
+                    expanded_path = temp_dir / "individuals.json"
+                    expanded_path.write_text(json.dumps(expanded, indent=2, ensure_ascii=False))
+                    st.session_state.individuals_textarea = json.dumps(expanded, indent=2, ensure_ascii=False)
+                    st.success("Sincronizado para temp_simulation/individuals.json")
+                except Exception as e:
+                    st.error(f"Erro ao sincronizar: {e}")
+    else:
+        st.info("Nenhum tipo de indivíduo criado ainda. Use o formulário acima para adicionar.")
 
     st.markdown("---")
     st.markdown("#### Editor de Indivíduos")
@@ -476,15 +849,54 @@ if st.session_state.run_sim:
                         nsga_config_json=None,
                         executada=1 if completed_process.returncode==0 else 0
                     )
+                    # If primary save failed, try to insert without specified id and get assigned id
+                    if not saved:
+                        try:
+                            new_id = db.create_simulation_return_id(
+                                id_mapa=map_id if isinstance(map_id, int) else -1,
+                                nome=simulation_name,
+                                algoritmo=algorithm,
+                                config_pedestres_json=individuals_json_str,
+                                pos_pedestres_json="[]",
+                                config_simulacao_json=config_simulacao_json_str,
+                                cli_config_json=json.dumps(cli_config, ensure_ascii=False),
+                                nsga_config_json=None,
+                                executada=1 if completed_process.returncode==0 else 0
+                            )
+                            if new_id:
+                                id_simulacao = new_id
+                                saved = True
+                        except Exception:
+                            saved = False
+
                     if saved:
-                        st.success("Resultados registrados no banco de dados.")
-                        # Se NSGA-II, vincula frente de Pareto ao banco
+                        st.success("Simulação registrada no banco de dados.")
+                        # ===== Save metrics.json (if produced) =====
+                        try:
+                            out_dir = Path("simulador_heuristica") / "output" / simulation_name
+                            metrics_path = out_dir / "metrics.json"
+                            if metrics_path.exists():
+                                metrics_json = metrics_path.read_text()
+                                ok_res = st.session_state.db_integration.save_result(id_simulacao, metrics_json)
+                                if ok_res:
+                                    st.success("Métricas salvas no banco de dados.")
+                                else:
+                                    st.warning("Falha ao salvar métricas no banco de dados.")
+                        except Exception as e:
+                            st.warning(f"Erro ao salvar métricas: {e}")
+
+                        # ===== NSGA-II specific results (pareto) =====
                         if algorithm == "NSGA-II":
                             try:
-                                fp_json = nsga_file.read_text()
-                                st.session_state.db_integration.save_nsga_results(id_simulacao, fp_json)
-                            except Exception:
-                                pass
+                                if nsga_file and nsga_file.exists():
+                                    fp_json = nsga_file.read_text()
+                                    ok_pf = st.session_state.db_integration.save_nsga_results(id_simulacao, fp_json)
+                                    if ok_pf:
+                                        st.success("Resultados NSGA-II salvos no banco de dados.")
+                                    else:
+                                        st.warning("Falha ao salvar resultados NSGA-II no banco de dados.")
+                            except Exception as e:
+                                st.warning(f"Erro ao salvar resultados NSGA-II: {e}")
                     else:
                         st.warning("Não foi possível salvar os resultados no banco.")
                 except Exception as e:
