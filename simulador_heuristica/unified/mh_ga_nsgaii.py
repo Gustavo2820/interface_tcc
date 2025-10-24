@@ -142,7 +142,7 @@ def nsgaii(factory, selector, population_size, mutation_probability,
         offspring = set()
 
         while len(offspring) < population_size:
-            parent_a, parent_b = selector(population)
+            parent_a, parent_b = selector(list(population))  # Convert set to list for sampling
             child1, child2 = factory.crossover(parent_a.gene, parent_b.gene)
 
             if np.random.uniform() < mutation_probability:

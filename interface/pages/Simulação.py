@@ -222,7 +222,7 @@ with col1:
             config_uploaded_path = config_path
             
             # Carrega configuração
-            if algorithm == "NSGA-II":
+            if algorithm in ["NSGA-II", "NSGA-II com Cache"]:
                 if st.session_state.nsga_integration.load_configuration(config_path):
                     st.success("Configuração carregada com sucesso!")
                     if st.session_state.nsga_integration.is_unified_config():
@@ -253,7 +253,7 @@ with col1:
             
             with col1:
                 st.markdown("### 🧬 Parâmetros do Algoritmo")
-                if algorithm == "NSGA-II":
+                if algorithm in ["NSGA-II", "NSGA-II com Cache"]:
                     population_size = st.number_input("Tamanho da população", min_value=2, value=20, help="Número de indivíduos na população")
                     generations = st.number_input("Número de gerações", min_value=1, value=10, help="Número de gerações para evolução")
                     crossover_rate = st.number_input("Taxa de crossover", min_value=0.0, max_value=1.0, value=0.8, step=0.05, help="Probabilidade de crossover")
@@ -280,7 +280,7 @@ with col1:
                 config_dir = Path("uploads")/"configs"
                 config_dir.mkdir(parents=True, exist_ok=True)
                 
-                if algorithm == "NSGA-II":
+                if algorithm in ["NSGA-II", "NSGA-II com Cache"]:
                     # Formato unificado para NSGA-II
                     unified_config = {
                         "nsga_config": {
@@ -319,8 +319,8 @@ with col1:
                 config_path = config_dir / f"unified_config_{algorithm.lower().replace(' ', '_')}_{_dt.now().strftime('%Y%m%d_%H%M%S')}.json"
                 config_path.write_text(json.dumps(unified_config, indent=2))
                 
-                # Carrega configuração se for NSGA-II
-                if algorithm == "NSGA-II":
+                # Carrega configuração se for NSGA-II ou NSGA-II com Cache
+                if algorithm in ["NSGA-II", "NSGA-II com Cache"]:
                     st.session_state.nsga_integration.load_configuration(config_path)
                 
                 st.success(f"✅ Configuração unificada salva em: `{config_path}`")
@@ -907,7 +907,7 @@ if st.session_state.run_sim:
                             st.warning(f"Erro ao salvar métricas: {e}")
 
                         # ===== NSGA-II specific results (pareto) =====
-                        if algorithm == "NSGA-II":
+                        if algorithm in ["NSGA-II", "NSGA-II com Cache"]:
                             try:
                                 if nsga_file and nsga_file.exists():
                                     fp_json = nsga_file.read_text()

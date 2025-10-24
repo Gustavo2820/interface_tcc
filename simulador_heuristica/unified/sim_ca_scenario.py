@@ -80,9 +80,29 @@ class Scenario(object):
         self.individuals = []
         with open(self.root_path + "input" + self.sep + self.directory + self.sep + "individuals.json", 'r') as json_file:
             data = json.load(json_file)
-            for caracterization in data['caracterizations']:
-                for _ in range(caracterization['amount']):
-                    self.individuals.append(Individual(caracterization, 0, 0))
+            
+            # Support both formats:
+            # 1. Old format: {"caracterizations": [{"amount": N, "red": R, "green": G, "blue": B, ...}]}
+            # 2. New format: [{"color": [R, G, B], ...}, ...] (flat array)
+            if isinstance(data, dict) and 'caracterizations' in data:
+                # Old grouped format
+                for caracterization in data['caracterizations']:
+                    for _ in range(caracterization['amount']):
+                        self.individuals.append(Individual(caracterization, 0, 0))
+            elif isinstance(data, list):
+                # New flat format - each item is an individual
+                # Need to normalize: convert "color": [R,G,B] to "red", "green", "blue"
+                for individual_spec in data:
+                    normalized = individual_spec.copy()
+                    if 'color' in normalized and isinstance(normalized['color'], list):
+                        # Convert array format to separate fields
+                        normalized['red'] = normalized['color'][0]
+                        normalized['green'] = normalized['color'][1]
+                        normalized['blue'] = normalized['color'][2]
+                        del normalized['color']
+                    self.individuals.append(Individual(normalized, 0, 0))
+            else:
+                raise ValueError(f"Unsupported individuals.json format: {type(data)}")
 
     
     def load_crowd_map(self):

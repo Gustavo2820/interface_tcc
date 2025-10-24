@@ -85,6 +85,9 @@ class StructureMap(object):
         logical
             Return if the structure map in the position i,j is an exit
         """
+        # Bounds check
+        if row < 0 or row >= self.len_row or col < 0 or col >= self.len_col:
+            return False
         return self.map[row][col] == Constants.M_DOOR 
 
     def get_exits(self):

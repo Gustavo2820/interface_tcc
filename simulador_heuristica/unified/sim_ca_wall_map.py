@@ -76,7 +76,9 @@ class WallMap(object):
                 if (self.structure_map.map[i][j] == Constants.M_WALL or self.structure_map.map[i][j] == Constants.M_OBJECT):
                     self.wall_direction(walls, i, j)
                     wall_map_row.append(0)
-                elif (self.structure_map.map[i][j] == Constants.M_EMPTY or self.structure_map.map[i][j] == Constants.M_DOOR or self.structure_map.map[i][j] == Constants.M_OBJECT or self.structure_map.map[i][j] == Constants.M_VOID):
+                else:
+                    # Treat all other values (including unknown/undefined) as empty space
+                    # This ensures every row has exactly len_col columns
                     wall_map_row.append(Constants.M_EMPTY)
             self.map.append(wall_map_row)
 
@@ -125,30 +127,82 @@ class WallMap(object):
         walls : list of list of int
             Contains the location of each door or wall placed in map.
         """
+        import logging
+        logger = logging.getLogger(__name__)
+        
         fifo_list = walls
-        for field in walls:
-            self.map[field[0]][field[1]] = field[2]
+        for i, field in enumerate(walls):
+            # Bounds check to prevent IndexError
+            row_idx = field[0]
+            col_idx = field[1]
+            value = field[2]
+            
+            if row_idx < 0 or row_idx >= self.len_row:
+                logger.warning(f"Initial field {i} row OUT OF BOUNDS: row={row_idx}, len_row={self.len_row}")
+                continue
+            
+            if col_idx < 0 or col_idx >= self.len_col:
+                logger.warning(f"Initial field {i} col OUT OF BOUNDS: col={col_idx}, len_col={self.len_col}")
+                continue
+            
+            # Sanity check: ensure self.map structure is correct
+            if row_idx >= len(self.map):
+                logger.error(f"CRITICAL: row_idx={row_idx} >= len(self.map)={len(self.map)}")
+                continue
+            
+            if col_idx >= len(self.map[row_idx]):
+                logger.error(f"CRITICAL: col_idx={col_idx} >= len(self.map[{row_idx}])={len(self.map[row_idx])}")
+                continue
+            
+            self.map[row_idx][col_idx] = value
+        
         while fifo_list:
-            field = fifo_list.pop(0)  
+            field = fifo_list.pop(0)
+            
+            # Bounds check for the current field before processing
+            if not (0 <= field[0] < self.len_row and 0 <= field[1] < self.len_col):
+                continue
 
             new_field = (field[0] + field[3][0], field[1] + field[3][1], field[2] + field[3][2], field[3])
-            if (self.is_expansible(new_field)):
+            
+            # Verify new_field is within bounds before checking if it's expansible
+            if not self.field_exist(new_field):
+                continue
+                
+            if self.is_expansible(new_field):
                 fifo_list.append(new_field)
                 self.map[new_field[0]][new_field[1]] = new_field[2]
 
             # If the position is a diagonal, is necessary to expand to two more directions
+            # Only add to fifo if the current field position is still valid
             if (field[3] == Constants.D_TOP_RIGHT):
-                fifo_list.append((field[0], field[1], field[2], Constants.D_TOP))
-                fifo_list.append((field[0], field[1], field[2], Constants.D_RIGHT))
-            if (field[3] == Constants.D_BOTTOM_RIGHT):
-                fifo_list.append((field[0], field[1], field[2], Constants.D_BOTTOM))
-                fifo_list.append((field[0], field[1], field[2], Constants.D_RIGHT))
-            if (field[3] == Constants.D_BOTTOM_LEFT):
-                fifo_list.append((field[0], field[1], field[2], Constants.D_BOTTOM))
-                fifo_list.append((field[0], field[1], field[2], Constants.D_LEFT))
-            if (field[3] == Constants.D_TOP_LEFT):
-                fifo_list.append((field[0], field[1], field[2], Constants.D_TOP))
-                fifo_list.append((field[0], field[1], field[2], Constants.D_LEFT))            
+                new_top = (field[0], field[1], field[2], Constants.D_TOP)
+                new_right = (field[0], field[1], field[2], Constants.D_RIGHT)
+                if self.field_exist(new_top):
+                    fifo_list.append(new_top)
+                if self.field_exist(new_right):
+                    fifo_list.append(new_right)
+            elif (field[3] == Constants.D_BOTTOM_RIGHT):
+                new_bottom = (field[0], field[1], field[2], Constants.D_BOTTOM)
+                new_right = (field[0], field[1], field[2], Constants.D_RIGHT)
+                if self.field_exist(new_bottom):
+                    fifo_list.append(new_bottom)
+                if self.field_exist(new_right):
+                    fifo_list.append(new_right)
+            elif (field[3] == Constants.D_BOTTOM_LEFT):
+                new_bottom = (field[0], field[1], field[2], Constants.D_BOTTOM)
+                new_left = (field[0], field[1], field[2], Constants.D_LEFT)
+                if self.field_exist(new_bottom):
+                    fifo_list.append(new_bottom)
+                if self.field_exist(new_left):
+                    fifo_list.append(new_left)
+            elif (field[3] == Constants.D_TOP_LEFT):
+                new_top = (field[0], field[1], field[2], Constants.D_TOP)
+                new_left = (field[0], field[1], field[2], Constants.D_LEFT)
+                if self.field_exist(new_top):
+                    fifo_list.append(new_top)
+                if self.field_exist(new_left):
+                    fifo_list.append(new_left)            
 
 
     def is_expansible(self, field):

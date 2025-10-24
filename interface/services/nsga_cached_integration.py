@@ -129,6 +129,8 @@ class CachedNSGAIntegration:
         """
         Prepare an Instance object for cached NSGA-II.
         
+        NOTE: This method is now simplified - file staging happens in run_optimization.
+        
         Args:
             experiment_name: Name of the experiment
             draw: Whether to draw simulation frames
@@ -173,31 +175,83 @@ class CachedNSGAIntegration:
             List of Chromosome objects (Pareto front) or None on error
         """
         if cached_nsgaii is None or Factory is None or selector is None:
-            logger.error("Cached NSGA-II not available")
+            logger.error("Cached NSGA-II not available - imports failed")
+            logger.error(f"  cached_nsgaii: {cached_nsgaii}")
+            logger.error(f"  Factory: {Factory}")
+            logger.error(f"  selector: {selector}")
+            print(f"[CACHED-NSGA] ERROR: Imports not available!")
+            print(f"[CACHED-NSGA]   cached_nsgaii: {cached_nsgaii is not None}")
+            print(f"[CACHED-NSGA]   Factory: {Factory is not None}")
+            print(f"[CACHED-NSGA]   selector: {selector is not None}")
             return None
         
         if not self.config:
             logger.error("Configuration not loaded")
+            print("[CACHED-NSGA] ERROR: Config not loaded!")
             return None
         
+        logger.info(f"DEBUG: Starting run_optimization with experiment: {experiment_name}")
+        logger.info(f"DEBUG: Config: {self.config}")
+        logger.info(f"DEBUG: Simulation params: {self.simulation_params}")
+        print(f"[CACHED-NSGA] Starting optimization: {experiment_name}")
+        print(f"[CACHED-NSGA] Config: {self.config}")
+        print(f"[CACHED-NSGA] Sim params: {self.simulation_params}")
+        
         try:
-            # Prepare instance
+            # CRITICAL: Stage input files BEFORE creating Instance/Factory
+            # The unified code expects files at: /home/gustavool/dev/input/<experiment>/
+            import os
+            import shutil
+            root_path = os.path.dirname(os.path.dirname(os.path.abspath("simulator"))) + os.path.sep
+            input_dir = Path(root_path) / "input" / experiment_name
+            input_dir.mkdir(parents=True, exist_ok=True)
+            
+            # Source files are in simulador_heuristica/input/<experiment>/
+            project_root = Path(__file__).resolve().parents[2]
+            source_dir = project_root / "simulador_heuristica" / "input" / experiment_name
+            
+            logger.info(f"Staging files from {source_dir} to {input_dir}")
+            print(f"[CACHED-NSGA] Staging files:")
+            print(f"  FROM: {source_dir}")
+            print(f"  TO: {input_dir}")
+            
+            if not (source_dir / "map.txt").exists():
+                raise FileNotFoundError(f"map.txt not found in {source_dir}")
+            if not (source_dir / "individuals.json").exists():
+                raise FileNotFoundError(f"individuals.json not found in {source_dir}")
+            
+            shutil.copy2(source_dir / "map.txt", input_dir / "map.txt")
+            shutil.copy2(source_dir / "individuals.json", input_dir / "individuals.json")
+            logger.info("✓ Files staged successfully")
+            print("[CACHED-NSGA] ✓ Files staged successfully")
+            
+            # Now prepare instance
             scenario_seed = self.simulation_params.get('scenario_seed', [0])
             if not isinstance(scenario_seed, list):
                 scenario_seed = [scenario_seed]
             
             simulation_seed = self.simulation_params.get('simulation_seed', 0)
             
-            instance = self.prepare_instance(
-                experiment_name=experiment_name,
+            print(f"[CACHED-NSGA] Creating instance with:")
+            print(f"  experiment: {experiment_name}")
+            print(f"  draw: {draw}")
+            print(f"  scenario_seed: {scenario_seed}")
+            print(f"  simulation_seed: {simulation_seed}")
+            
+            instance = Instance(
+                experiment=experiment_name,
                 draw=draw,
                 scenario_seed=scenario_seed,
                 simulation_seed=simulation_seed
             )
             
+            print(f"[CACHED-NSGA] Instance created: {instance}")
+            
             # Create factory with caching
             logger.info("Creating Factory with simulation caching...")
+            print("[CACHED-NSGA] Creating Factory...")
             factory = Factory(instance)
+            print(f"[CACHED-NSGA] Factory created: {factory}")
             
             # Run cached NSGA-II
             population_size = self.config['population_size']
@@ -206,6 +260,7 @@ class CachedNSGAIntegration:
             
             logger.info(f"Starting cached NSGA-II: pop={population_size}, "
                        f"mut={mutation_prob}, gen={max_generations}")
+            print(f"[CACHED-NSGA] Running NSGA-II: pop={population_size}, mut={mutation_prob}, gen={max_generations}")
             
             results = cached_nsgaii(
                 factory=factory,
@@ -215,13 +270,22 @@ class CachedNSGAIntegration:
                 max_generations=max_generations
             )
             
+            logger.info(f"DEBUG: cached_nsgaii returned: {type(results)}")
+            logger.info(f"DEBUG: results length: {len(results) if results else 'None'}")
+            print(f"[CACHED-NSGA] NSGA-II returned: type={type(results)}, len={len(results) if results else 'None'}")
             logger.info(f"Cached NSGA-II completed: {len(results)} solutions in Pareto front")
             logger.info(f"Cache statistics: {len(factory.cache)} simulations cached")
+            print(f"[CACHED-NSGA] Completed: {len(results)} solutions, {len(factory.cache)} cached sims")
             
+            logger.info(f"DEBUG: Returning tuple (results, factory)")
+            print(f"[CACHED-NSGA] Returning tuple (results, factory)")
             return results, factory
             
         except Exception as e:
+            import traceback
             logger.exception(f"Error running cached NSGA-II: {e}")
+            print(f"[CACHED-NSGA] EXCEPTION: {e}")
+            print(f"[CACHED-NSGA] Traceback:\n{traceback.format_exc()}")
             return None
     
     def convert_results_to_standard_format(

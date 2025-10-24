@@ -661,18 +661,38 @@ class NSGAIntegration:
             cached_nsga.config = self.config
             cached_nsga.simulation_params = self.get_simulation_params()
             
+            logger.info(f"DEBUG: Config transferred: {cached_nsga.config}")
+            logger.info(f"DEBUG: Simulation params: {cached_nsga.simulation_params}")
+            print(f"[NSGA-INTEGRATION] Config transferred: {cached_nsga.config}")
+            print(f"[NSGA-INTEGRATION] Simulation params: {cached_nsga.simulation_params}")
+            
             # Run optimization
             logger.info("Running CACHED NSGA-II optimization...")
+            print("[NSGA-INTEGRATION] Calling cached_nsga.run_optimization...")
             result = cached_nsga.run_optimization(
                 experiment_name=experiment_name,
                 draw=draw
             )
             
+            logger.info(f"DEBUG: result type: {type(result)}")
+            logger.info(f"DEBUG: result value: {result}")
+            print(f"[NSGA-INTEGRATION] Result type: {type(result)}")
+            print(f"[NSGA-INTEGRATION] Result is None: {result is None}")
+            
             if result is None:
-                logger.error("Cached NSGA-II optimization failed")
+                logger.error("Cached NSGA-II optimization failed - returned None")
+                print("[NSGA-INTEGRATION] ERROR: Result is None!")
                 return None
             
-            results_list, factory = result
+            try:
+                results_list, factory = result
+                logger.info(f"DEBUG: Unpacked successfully - results_list has {len(results_list) if results_list else 0} items")
+                print(f"[NSGA-INTEGRATION] Unpacked: {len(results_list) if results_list else 0} results")
+            except Exception as unpack_error:
+                logger.error(f"Failed to unpack result: {unpack_error}")
+                logger.error(f"Result was: {result}")
+                print(f"[NSGA-INTEGRATION] ERROR unpacking: {unpack_error}")
+                return None
             
             # Return results in a format compatible with save_results
             return {

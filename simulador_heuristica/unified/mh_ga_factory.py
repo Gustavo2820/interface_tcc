@@ -156,6 +156,9 @@ class Factory(ChromosomeFactory):
 
 def selector(population):
     """Tournament selection."""
+    # Ensure population is a list/sequence
+    if not isinstance(population, (list, tuple)):
+        population = list(population)
     pool = sample(population, 4)
     pool.sort()
     return pool[0], pool[1]

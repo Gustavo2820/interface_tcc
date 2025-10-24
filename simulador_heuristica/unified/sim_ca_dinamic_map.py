@@ -104,7 +104,19 @@ class DinamicMap(object):
 
 
     def calc_dinamic_value(self, row, col, individual_KW):
-        return exp(individual_KW * self.map[row][col])
+        # Bounds check
+        if row < 0 or row >= self.len_row or col < 0 or col >= self.len_col:
+            return 1.0  # Neutral value
+        
+        # Clamp to prevent overflow in exp()
+        # exp(709) ≈ 8.2e+307 (near max float)
+        value = individual_KW * self.map[row][col]
+        if value > 700:
+            value = 700
+        elif value < -700:
+            value = -700
+        
+        return exp(value)
 
 
     def reset_map(self):

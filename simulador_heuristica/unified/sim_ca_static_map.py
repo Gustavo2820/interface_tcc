@@ -78,7 +78,9 @@ class StaticMap(object):
                     static_map_row.append(1)
                 elif (self.structure_map.map[i][j] == Constants.M_WALL or self.structure_map.map[i][j] == Constants.M_OBJECT or self.structure_map.map[i][j] == Constants.M_VOID): # If it is a WALL, OBJECT or VOID
                     static_map_row.append(Constants.S_WALL)
-                elif (self.structure_map.map[i][j] == Constants.M_EMPTY):
+                else:
+                    # Treat all other values (including unknown/undefined like 9) as empty space
+                    # This ensures every row has exactly len_col columns
                     static_map_row.append(Constants.M_EMPTY)
             self.map.append(static_map_row)
 
