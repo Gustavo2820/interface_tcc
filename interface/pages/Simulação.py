@@ -72,7 +72,7 @@ mapas_dir.mkdir(exist_ok=True)
 map_options = sorted([p.stem for p in mapas_dir.glob("*.png")])
 # Prefill defaults (will be overridden if query params or existing simulation present)
 prefill_simulation_name = "sim_default"
-algorithms_list = ["Simulação Direta","Algoritmo Genético","NSGA-II","Força Bruta"]
+algorithms_list = ["Simulação Direta","NSGA-II","NSGA-II com Cache","Força Bruta"]
 prefill_algorithm = algorithms_list[0]
 prefill_mapa = None
 
@@ -732,14 +732,23 @@ if st.session_state.run_sim:
                 shutil.copy2(main_map_path, simulator_input_dir / "map.txt")
                 shutil.copy2(individuals_path, simulator_input_dir / "individuals.json")
 
-                # Se NSGA-II, executa otimização multiobjetivo
-                if algorithm == "NSGA-II":
-                    st.info("Iniciando execução NSGA-II...")
+                # Se NSGA-II (standard ou cached), executa otimização multiobjetivo
+                if algorithm in ["NSGA-II", "NSGA-II com Cache"]:
+                    use_cached = (algorithm == "NSGA-II com Cache")
+                    st.info(f"Iniciando execução {algorithm}...")
+                    
                     # exige configuração NSGA-II carregada
                     if not getattr(st.session_state.nsga_integration, 'config', None):
                         st.error("Configuração NSGA-II não encontrada no session_state")
                         raise RuntimeError("Configuração do NSGA-II não carregada. Crie ou carregue uma configuração acima.")
                     st.info(f"Configuração NSGA-II encontrada: {st.session_state.nsga_integration.config}")
+                    
+                    # Set the workflow mode (standard or cached)
+                    st.session_state.nsga_integration.set_use_cached(use_cached)
+                    if use_cached:
+                        st.success("✓ Modo Cached NSGA-II habilitado (com cache de simulações)")
+                    else:
+                        st.info("Usando NSGA-II padrão (pymoo)")
                     
                     # Obtém parâmetros de simulação da configuração unificada
                     sim_params = st.session_state.nsga_integration.get_simulation_params()
@@ -762,22 +771,34 @@ if st.session_state.run_sim:
                         door_positions = st.session_state.nsga_integration.extract_door_positions_from_map(map_template)
                         st.info(f"Posições de portas extraídas: {len(door_positions)} posições")
                         
-                        ok = st.session_state.nsga_integration.setup_optimization(
-                            map_template=map_template,
-                            individuals_template=individuals_template,
-                            door_positions=door_positions
-                        )
-                        st.info(f"setup_optimization retornou: {ok}")
+                        # Setup only for standard NSGA-II (cached has different flow)
+                        if not use_cached:
+                            ok = st.session_state.nsga_integration.setup_optimization(
+                                map_template=map_template,
+                                individuals_template=individuals_template,
+                                door_positions=door_positions
+                            )
+                            st.info(f"setup_optimization retornou: {ok}")
+                            if not ok:
+                                st.error("setup_optimization retornou False - verifique os logs acima")
+                                raise RuntimeError("Falha ao configurar NSGA-II")
+                        else:
+                            st.info("Modo cached: pulando setup_optimization (não necessário)")
+                            ok = True
                     except Exception as e:
                         import traceback
                         st.error(f"Exceção ao chamar setup_optimization: {e}")
                         st.text("Traceback completo:")
                         st.code(traceback.format_exc())
                         ok = False
+                    
                     if not ok:
-                        st.error("setup_optimization retornou False - verifique os logs acima")
                         raise RuntimeError("Falha ao configurar NSGA-II")
-                    pareto = st.session_state.nsga_integration.run_optimization()
+                    
+                    # Run optimization (experiment_name required for cached)
+                    pareto = st.session_state.nsga_integration.run_optimization(
+                        experiment_name=simulation_name if use_cached else None
+                    )
                     if not pareto:
                         raise RuntimeError("NSGA-II não retornou resultados")
                     # salva resultados em uploads/nsga_ii
@@ -787,7 +808,7 @@ if st.session_state.run_sim:
                     nsga_file = out_dir_nsga / f"results_{simulation_name}_{_dt.now().strftime('%Y%m%d_%H%M%S')}.json"
                     st.session_state.nsga_integration.save_results(pareto, nsga_file)
                     # marca como sucesso
-                    completed_process = type("Proc", (), {"returncode": 0, "stdout": "NSGA-II concluído", "stderr": ""})()
+                    completed_process = type("Proc", (), {"returncode": 0, "stdout": f"{algorithm} concluído", "stderr": ""})()
                 else:
                     # Para outros algoritmos, usa parâmetros da configuração unificada ou padrões
                     sim_params = st.session_state.get('simulation_params', {})

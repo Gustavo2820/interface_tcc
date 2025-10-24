@@ -3,6 +3,9 @@ Módulo de integração com o simulador de heurística.
 
 Este módulo implementa as funções necessárias para integrar a interface Streamlit
 com o simulador de evacuação, seguindo as diretrizes da documentação de integração.
+
+NOTE: This module now delegates to simulador_heuristica.simulator.integration_api
+for all map/door/individuals logic. No simulation logic is duplicated here.
 """
 import subprocess
 import sys
@@ -13,83 +16,26 @@ from datetime import datetime
 from typing import Dict, List, Optional, Tuple
 import sqlite3
 
-# ======= STRUCTURE MAP =======
-# Import 'simulador_heuristica' in a robust way: if the package isn't on sys.path
-# (for example when Streamlit imports modules from the `interface/` folder),
-# insert the project root into sys.path and retry the import.
+# ======= SIMULATOR IMPORTS =======
+# Import the official integration API and simulator modules
 try:
     from simulador_heuristica.simulator.constants import Constants
+    from simulador_heuristica.simulator import integration_api
+    from simulador_heuristica.simulator.structure_map import StructureMap
 except Exception:
     current_file = Path(__file__).resolve()
-    # project_root points to repository root (two levels up from interface/services)
     project_root = current_file.parents[2]
     if str(project_root) not in sys.path:
         sys.path.insert(0, str(project_root))
     from simulador_heuristica.simulator.constants import Constants
+    from simulador_heuristica.simulator import integration_api
+    from simulador_heuristica.simulator.structure_map import StructureMap
 
-class StructureMap(object):
-    """Responsável por armazenar informações físicas do mapa: portas, paredes, etc."""
 
-    def __init__(self, label, path: Optional[str] = None):
-        self.label = label
-        # Se path não for fornecido, monta caminho relativo: simulador_heuristica/input/<label>/map.txt
-        if path is None:
-            self.path = Path(__file__).parent.parent / "input" / label / "map.txt"
-        else:
-            self.path = Path(path)
-        self.map = []
-        self.len_row = 0
-        self.len_col = 0
-        self.exits = []
-
-    def load_map(self):
-        """Lê o arquivo de mapa e constrói o mapa da estrutura."""
-        if not self.path.exists():
-            raise FileNotFoundError(f"Mapa não encontrado em {self.path}")
-        with open(self.path, 'r') as file:
-            for line in file:
-                line = line.strip('\n')
-                self.map.append([])
-                for col in line:
-                    self.map[self.len_row].append(int(col))
-                self.len_row += 1
-        self.len_col = len(self.map[0])
-        self.exits = self.get_exits()
-
-    def get_empty_positions(self) -> List[Tuple[int, int]]:
-        """Retorna uma lista com posições vazias do mapa."""
-        empty_positions = []
-        for i in range(self.len_row):
-            for j in range(self.len_col):
-                if self.map[i][j] == Constants.M_EMPTY:
-                    empty_positions.append((i, j))
-        return empty_positions
-
-    def isSaida(self, row: int, col: int) -> bool:
-        """Retorna se a posição é uma saída."""
-        return self.map[row][col] == Constants.M_DOOR
-
-    def get_exits(self) -> List[Tuple[int, int]]:
-        """Retorna uma lista com as saídas do mapa."""
-        exits = []
-        for i in range(self.len_row):
-            for j in range(self.len_col):
-                if self.map[i][j] == Constants.M_DOOR:
-                    exits.append((i, j))
-        return exits
-
-    def rewrite_doors(self, new_doors):
-        """Substitui portas existentes por novas portas."""
-        for exit in self.exits:
-            self.map[exit[0]][exit[1]] = Constants.M_WALL
-        for new_door in new_doors:
-            if new_door['direction'] == 'V':
-                for i in range(new_door['size']):
-                    self.map[new_door['row'] + i][new_door['col']] = Constants.M_DOOR
-            else:
-                for i in range(new_door['size']):
-                    self.map[new_door['row']][new_door['col'] + i] = Constants.M_DOOR
-        self.exits = self.get_exits()
+# ======= REMOVED: Duplicated StructureMap class =======
+# This class previously duplicated logic from simulador_heuristica.simulator.structure_map
+# Integration code should now use the official StructureMap from the simulator package.
+# See: simulador_heuristica/simulator/structure_map.py for the canonical implementation.
 
 
 # ======= SIMULATOR INTEGRATION =======

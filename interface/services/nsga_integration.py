@@ -11,6 +11,8 @@ from typing import List, Dict, Any, Optional
 import numpy as np
 import streamlit as st
 from .logger import default_log as logger
+import types
+import warnings
 
 # Adiciona o caminho do simulador ao sys.path para importar módulos
 # Usa caminho absoluto baseado na raiz do projeto (duas pastas acima de `services`)
@@ -31,6 +33,24 @@ print("DEBUG: Tentando importar módulos NSGA-II...")
 print(f"DEBUG: simulador_path: {simulador_path}")
 print(f"DEBUG: unified_path: {unified_path}")
 print(f"DEBUG: sys.path entries: {[p for p in sys.path if 'simulador' in p]}")
+
+# Import the unified integration API (single source of truth for simulator logic)
+try:
+    from simulador_heuristica.simulator import integration_api
+    print("DEBUG: integration_api imported successfully")
+except ImportError as e:
+    print(f"WARNING: Could not import integration_api: {e}")
+    integration_api = None
+
+# Import cached NSGA-II integration (optional)
+try:
+    from .nsga_cached_integration import get_cached_nsga_integration
+    print("DEBUG: Cached NSGA-II integration available")
+    CACHED_NSGA_AVAILABLE = True
+except ImportError as e:
+    print(f"DEBUG: Cached NSGA-II not available: {e}")
+    get_cached_nsga_integration = None
+    CACHED_NSGA_AVAILABLE = False
 
 try:
     print("DEBUG: Importando pymoo...")
@@ -238,8 +258,12 @@ class EvacuationProblem(Problem):
                 # No invented values: return explicit penalty but log for audit
                 return [1e6, 1e6]
 
-            # Determine first objective (num_doors) from selected door positions
-            num_doors = len(door_positions)
+            # num_doors should reflect number of selected door *configurations* (grouped doors)
+            # If door_positions contains door dicts (from extract_doors_info), count them; otherwise count tuples
+            if door_positions and isinstance(door_positions[0], dict):
+                num_doors = len(door_positions)
+            else:
+                num_doors = len(door_positions)
 
             # Extract numeric objective distance (and optionally num_doors) from results
             obj = self._extract_objectives(results, stdout=stdout, stderr=stderr, num_doors=num_doors)
@@ -287,15 +311,20 @@ class EvacuationProblem(Problem):
             Lista de tuplas (x, y) com posições das portas
         """
         # Converte gene binário para posições de portas
-        door_positions = []
+        # Decode gene to selected door configurations or tuples.
+        # The self.door_positions may contain either tuples (x,y) or dicts produced by
+        # simulador_heuristica.simulator.sim_ca_scenario.extract_doors_info (grouped doors).
+        selected = []
         for i, bit in enumerate(gene):
-            if bit == 1 and i < len(self.door_positions):
-                door_positions.append(self.door_positions[i])
-        return door_positions
+            if int(bit) == 1 and i < len(self.door_positions):
+                selected.append(self.door_positions[i])
+        return selected
     
     def _generate_map_with_doors(self, door_positions: List[tuple]) -> str:
         """
         Gera o conteúdo do mapa com as portas posicionadas.
+        
+        Now delegates to integration_api for consistent door placement logic.
         
         Args:
             door_positions: Lista de posições das portas a serem ativadas
@@ -303,18 +332,70 @@ class EvacuationProblem(Problem):
         Returns:
             Conteúdo do mapa como string
         """
+        # OFFICIAL INTEGRATION: Use the unified API for map generation
+        if integration_api is not None:
+            try:
+                # Filter to only dict entries (grouped doors)
+                grouped_doors = [d for d in door_positions if isinstance(d, dict)]
+                return integration_api.generate_map_text_with_grouped_doors(
+                    self.map_template, 
+                    grouped_doors
+                )
+            except Exception as e:
+                logger.error(f"Failed to call integration_api.generate_map_text_with_grouped_doors: {e}")
+                # Fall through to legacy fallback
+        
+        # DEPRECATED FALLBACK: manual string manipulation
+        logger.warning("integration_api not available, using deprecated fallback for map generation")
         lines = self.map_template.split('\n')
         
         # Primeiro, desativa todas as portas existentes (converte '2' para '0')
         for y, line in enumerate(lines):
             lines[y] = line.replace('2', '0')
         
-        # Depois, ativa apenas as portas selecionadas (converte '0' para '2' nas posições escolhidas)
-        for x, y in door_positions:
-            if 0 <= y < len(lines) and 0 <= x < len(lines[y]):
-                line = list(lines[y])
-                line[x] = '2'  # 2 representa porta ativa no formato do simulador
-                lines[y] = ''.join(line)
+        # Depois, ativa apenas as portas selecionadas.
+        # door_positions entries may be tuples (x,y) or dicts describing grouped doors
+        for entry in door_positions:
+            if isinstance(entry, dict):
+                # grouped door: has 'row','col','size','direction'
+                r = int(entry.get('row', 0))
+                c = int(entry.get('col', 0))
+                size = int(entry.get('size', 1))
+                direction = entry.get('direction', '')
+                if direction == 'H':
+                    for offset in range(size):
+                        x = c + offset
+                        y = r
+                        if 0 <= y < len(lines) and 0 <= x < len(lines[y]):
+                            line = list(lines[y])
+                            line[x] = '2'
+                            lines[y] = ''.join(line)
+                elif direction == 'V':
+                    for offset in range(size):
+                        x = c
+                        y = r + offset
+                        if 0 <= y < len(lines) and 0 <= x < len(lines[y]):
+                            line = list(lines[y])
+                            line[x] = '2'
+                            lines[y] = ''.join(line)
+                else:
+                    # fallback: treat as single coordinate if present
+                    x = int(entry.get('col', 0))
+                    y = int(entry.get('row', 0))
+                    if 0 <= y < len(lines) and 0 <= x < len(lines[y]):
+                        line = list(lines[y])
+                        line[x] = '2'
+                        lines[y] = ''.join(line)
+            else:
+                # legacy tuple (x,y)
+                try:
+                    x, y = entry
+                    if 0 <= y < len(lines) and 0 <= x < len(lines[y]):
+                        line = list(lines[y])
+                        line[x] = '2'  # 2 representa porta ativa no formato do simulador
+                        lines[y] = ''.join(line)
+                except Exception:
+                    continue
         
         return '\n'.join(lines)
     
@@ -457,6 +538,7 @@ class NSGAIntegration:
         self.simulator_integration = simulator_integration
         self.nsga = None
         self.factory = None
+        self.use_cached = False  # Flag to select between standard/cached NSGA-II
     
     def load_configuration(self, config_file: Path) -> bool:
         """
@@ -529,28 +611,113 @@ class NSGAIntegration:
         """
         return getattr(self, 'is_unified_format', False)
     
+    def set_use_cached(self, use_cached: bool) -> bool:
+        """
+        Set whether to use cached NSGA-II or standard pymoo NSGA-II.
+        
+        Args:
+            use_cached: True to use cached NSGA-II, False for standard
+            
+        Returns:
+            True if the selected mode is available, False otherwise
+        """
+        if use_cached and not CACHED_NSGA_AVAILABLE:
+            logger.warning("Cached NSGA-II requested but not available")
+            return False
+        
+        self.use_cached = use_cached
+        logger.info(f"NSGA-II mode set to: {'CACHED' if use_cached else 'STANDARD (pymoo)'}")
+        return True
+    
+    def run_cached_nsga(
+        self,
+        experiment_name: str,
+        draw: bool = False
+    ) -> Optional[Dict]:
+        """
+        Run optimization using cached NSGA-II from unified folder.
+        
+        Args:
+            experiment_name: Name of the experiment
+            draw: Whether to draw simulation frames
+            
+        Returns:
+            Results dict or None on error
+        """
+        if not CACHED_NSGA_AVAILABLE:
+            logger.error("Cached NSGA-II not available")
+            return None
+        
+        try:
+            # Get cached NSGA integration
+            cached_nsga = get_cached_nsga_integration(self.simulator_integration)
+            
+            # Use the same configuration
+            if not hasattr(self, 'config') or not self.config:
+                logger.error("Configuration not loaded")
+                return None
+            
+            # Transfer config to cached NSGA (it reads same format)
+            cached_nsga.config = self.config
+            cached_nsga.simulation_params = self.get_simulation_params()
+            
+            # Run optimization
+            logger.info("Running CACHED NSGA-II optimization...")
+            result = cached_nsga.run_optimization(
+                experiment_name=experiment_name,
+                draw=draw
+            )
+            
+            if result is None:
+                logger.error("Cached NSGA-II optimization failed")
+                return None
+            
+            results_list, factory = result
+            
+            # Return results in a format compatible with save_results
+            return {
+                'results': results_list,
+                'factory': factory,
+                'algorithm': 'NSGA-II-Cached'
+            }
+            
+        except Exception as e:
+            logger.exception(f"Error in cached NSGA-II: {e}")
+            return None
+    
     def extract_door_positions_from_map(self, map_template: str) -> List[tuple]:
         """
         Extrai posições das portas existentes no mapa.
+        
+        This method now delegates to the official integration_api module.
+        Returns grouped door dictionaries (not tuples) for consistency with simulator.
         
         Args:
             map_template: Template do mapa como string
             
         Returns:
-            Lista de tuplas (x, y) com posições das portas existentes
+            Lista de dicionários com portas agrupadas {'row','col','size','direction'}
         """
+        # OFFICIAL INTEGRATION: Delegate to the unified API (single source of truth)
+        if integration_api is not None:
+            try:
+                doors_info = integration_api.extract_doors_from_map_text(map_template)
+                print(f"DEBUG: integration_api.extract_doors_from_map_text returned {len(doors_info)} grouped doors")
+                return doors_info
+            except Exception as e:
+                logger.error(f"Failed to call integration_api.extract_doors_from_map_text: {e}")
+                # Fall through to legacy fallback
+        
+        # DEPRECATED FALLBACK: only used if integration_api is unavailable
+        logger.warning("integration_api not available, using deprecated fallback logic")
         door_positions = []
         lines = map_template.strip().split('\n')
-        
         for y, line in enumerate(lines):
             for x, char in enumerate(line):
-                # Procura por portas existentes (valor 2 = M_DOOR)
                 if char == '2':
                     door_positions.append((x, y))
         
-        print(f"DEBUG: Encontradas {len(door_positions)} portas existentes no mapa")
-        if door_positions:
-            print(f"DEBUG: Posições das portas: {door_positions}")
+        print(f"DEBUG: Fallback found {len(door_positions)} door cells (legacy per-cell format)")
         return door_positions
     
     def setup_optimization(
@@ -628,13 +795,29 @@ class NSGAIntegration:
             st.code(traceback.format_exc())
             return False
     
-    def run_optimization(self) -> Optional[Dict]:
+    def run_optimization(self, experiment_name: Optional[str] = None) -> Optional[Dict]:
         """
-        Executa a otimização NSGA-II com pymoo.
+        Executa a otimização NSGA-II (pymoo ou cached).
+        
+        Args:
+            experiment_name: Nome do experimento (required for cached NSGA-II)
         
         Returns:
-            Resultado da otimização do pymoo, ou None em caso de erro
+            Resultado da otimização, ou None em caso de erro
         """
+        # Check if using cached NSGA-II
+        if self.use_cached:
+            logger.info("Using CACHED NSGA-II workflow")
+            if not experiment_name:
+                logger.error("experiment_name required for cached NSGA-II")
+                return None
+            
+            draw_mode = self.get_simulation_params().get('draw_mode', False)
+            return self.run_cached_nsga(experiment_name=experiment_name, draw=draw_mode)
+        
+        # Standard pymoo workflow
+        logger.info("Using STANDARD (pymoo) NSGA-II workflow")
+        
         if not hasattr(self, 'problem') or not hasattr(self, 'algorithm'):
             print("NSGA-II não configurado")
             return None
@@ -668,15 +851,35 @@ class NSGAIntegration:
     
     def save_results(self, result: Dict, output_file: Path) -> bool:
         """
-        Salva os resultados da otimização pymoo.
+        Salva os resultados da otimização (pymoo ou cached NSGA-II).
         
         Args:
-            result: Resultado da otimização do pymoo
+            result: Resultado da otimização (pymoo ou cached dict)
             output_file: Arquivo de saída
             
         Returns:
             True se salvou com sucesso, False caso contrário
         """
+        # Check if this is cached NSGA-II results (matches "NSGA-II-Cached" or "NSGA-II-Cached-2obj" or "NSGA-II-Cached-3obj")
+        if isinstance(result, dict) and 'algorithm' in result and 'NSGA-II-Cached' in result['algorithm']:
+            logger.info(f"Saving cached NSGA-II results (algorithm: {result['algorithm']})...")
+            
+            if not CACHED_NSGA_AVAILABLE:
+                logger.error("Cannot save cached results: cached NSGA not available")
+                return False
+            
+            try:
+                cached_nsga = get_cached_nsga_integration(self.simulator_integration)
+                return cached_nsga.save_results(
+                    results=result['results'],
+                    factory=result['factory'],
+                    output_file=output_file
+                )
+            except Exception as e:
+                logger.exception(f"Error saving cached NSGA-II results: {e}")
+                return False
+        
+        # Standard pymoo results - use existing logic
         def _to_native(o):
             """Recursively convert numpy types to native Python types for JSON serialization."""
             try:
@@ -726,6 +929,14 @@ class NSGAIntegration:
                         dp = self.problem.door_positions[j]
                         if isinstance(dp, (list, tuple)):
                             dp = (int(dp[0]), int(dp[1]))
+                        elif isinstance(dp, dict):
+                            # preserve grouped-door structure but ensure native types
+                            dp = {
+                                'row': int(dp.get('row', 0)),
+                                'col': int(dp.get('col', 0)),
+                                'size': int(dp.get('size', 1)),
+                                'direction': str(dp.get('direction', ''))
+                            }
                         door_positions.append(dp)
 
                 # Objectives expected to be [num_doors, distance] (2 elements)
@@ -768,10 +979,58 @@ class NSGAIntegration:
                     except Exception:
                         aux_iterations = None
 
+                # Build expanded per-cell door coordinates from grouped/tuple representations.
+                # OFFICIAL INTEGRATION: Use integration_api.expand_grouped_doors
+                expanded_positions = []
+                if integration_api is not None:
+                    try:
+                        expanded_positions = integration_api.expand_grouped_doors(door_positions)
+                    except Exception as e:
+                        logger.error(f"Failed to call integration_api.expand_grouped_doors: {e}")
+                        # Fall through to manual expansion
+                
+                # DEPRECATED FALLBACK: manual expansion logic
+                if not expanded_positions:
+                    try:
+                        for dp in door_positions:
+                            if isinstance(dp, (list, tuple)):
+                                # dp is (x,y)
+                                expanded_positions.append([int(dp[0]), int(dp[1])])
+                            elif isinstance(dp, dict):
+                                # grouped door: expand according to direction and size
+                                r = int(dp.get('row', 0))
+                                c = int(dp.get('col', 0))
+                                size = int(dp.get('size', 1))
+                                direction = str(dp.get('direction', ''))
+                                if direction == 'H':
+                                    for offset in range(size if size>0 else 1):
+                                        expanded_positions.append([c + offset, r])
+                                elif direction == 'V':
+                                    for offset in range(size if size>0 else 1):
+                                        expanded_positions.append([c, r + offset])
+                                else:
+                                    # fallback: single cell
+                                    expanded_positions.append([c, r])
+                            else:
+                                # unknown type, attempt to coerce
+                                try:
+                                    x, y = dp
+                                    expanded_positions.append([int(x), int(y)])
+                                except Exception:
+                                    continue
+                    except Exception:
+                        expanded_positions = []
+
+                # Preserve the original/grouped descriptor under a separate key,
+                # but keep `door_positions` as the expanded per-cell coordinates
+                # because downstream UI (pages/Resultados.py) expects a list of [x,y].
                 res_obj = {
                     "solution_id": int(i),
                     "gene": _to_native(solution.tolist()),
-                    "door_positions": _to_native(door_positions),
+                    # Provide expanded per-cell positions as the primary key for compatibility
+                    "door_positions": _to_native(expanded_positions),
+                    # Keep grouped/native representation for traceability
+                    "door_positions_grouped": _to_native(door_positions),
                     "objectives": _to_native(obj_list),
                     "num_doors": int(int(sum(solution))),
                     "iterations": int(aux_iterations) if aux_iterations is not None else None
