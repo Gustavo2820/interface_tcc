@@ -277,27 +277,7 @@ with tab3:
     
         ### Explicação dos pesos (KD, KS, KW, KI)
 
-        Estes parâmetros controlam como cada indivíduo reage a forças modeladas na simulação (modelo de "força social"). Abaixo uma explicação em linguagem simples e dicas práticas:
-
-        - KD — Força de direção/propulsão (driving force)
-            - O quanto o indivíduo se esforça para seguir seu objetivo (ir até a saída).
-            - Valores maiores → movimento mais determinado em direção à saída (pessoa "empurrando" na direção do objetivo).
-            - Faixa sugerida: 0.0 — 5.0. Exemplo: 0.5 = passivo, 2.0 = determinado.
-
-        - KS — Força social (repulsão entre pessoas)
-            - Controla quanto o indivíduo evita colisões com outras pessoas.
-            - Valores maiores → mantém mais distância, evita aglomerações.
-            - Faixa sugerida: 0.0 — 5.0. Exemplo: 0.2 = pouco evasivo, 1.5 = evita fortemente contato.
-
-        - KW — Força de parede/obstáculo (repulsão de objetos)
-            - Determina o quanto o indivíduo evita paredes e obstáculos.
-            - Valores maiores → mantém-se mais afastado de paredes/colunas.
-            - Faixa sugerida: 0.0 — 5.0. Exemplo: 0.5 = aproxima-se de paredes, 2.0 = evita paredes.
-
-        - KI — Peso de interações internas / inércia / coesão (termo adicional de interação)
-            - Usado pelo modelo para efeitos extra (por exemplo, coesão de pequenos grupos, inércia ou componentes de ruído). A interpretação exata pode variar conforme a implementação.
-            - Valores maiores → aumentam a influência dessas interações adicionais.
-            - Faixa sugerida: 0.0 — 2.0. Exemplo: 0.0 = desativado, 0.5 — leve efeito de coesão.
+        Estes parâmetros controlam como cada indivíduo reage a forças modeladas na simulação (modelo de "força social"). Eles influenciam o comportamento dos pedestres durante a evacuação.
     
     ---
     
