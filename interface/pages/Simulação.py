@@ -54,6 +54,7 @@ if project_root not in sys.path:
 from services.simulator_integration import SimulatorIntegration, DatabaseIntegration
 from services.map_creation_integration import map_creation_service
 from services.nsga_integration import NSGAIntegration
+from services.bruteforce_integration import get_bruteforce_integration
 
 # ================= CONFIGURAÇÃO DA PÁGINA =================
 st.set_page_config(page_title="Simulação", layout="wide")
@@ -65,6 +66,8 @@ if 'db_integration' not in st.session_state:
     st.session_state.db_integration = DatabaseIntegration()
 if 'nsga_integration' not in st.session_state:
     st.session_state.nsga_integration = NSGAIntegration(st.session_state.simulator_integration)
+if 'bruteforce_integration' not in st.session_state:
+    st.session_state.bruteforce_integration = get_bruteforce_integration(st.session_state.simulator_integration)
 
 # ================= CARREGAMENTO DE MAPAS =================
 mapas_dir = Path("mapas")
@@ -72,7 +75,7 @@ mapas_dir.mkdir(exist_ok=True)
 map_options = sorted([p.stem for p in mapas_dir.glob("*.png")])
 # Prefill defaults (will be overridden if query params or existing simulation present)
 prefill_simulation_name = "sim_default"
-algorithms_list = ["Simulação Direta","NSGA-II","NSGA-II com Cache","Força Bruta"]
+algorithms_list = ["NSGA-II","NSGA-II com Cache","Força Bruta"]
 prefill_algorithm = algorithms_list[0]
 prefill_mapa = None
 
@@ -809,6 +812,100 @@ if st.session_state.run_sim:
                     st.session_state.nsga_integration.save_results(pareto, nsga_file)
                     # marca como sucesso
                     completed_process = type("Proc", (), {"returncode": 0, "stdout": f"{algorithm} concluído", "stderr": ""})()
+                
+                elif algorithm == "Força Bruta":
+                    st.info("Iniciando execução Força Bruta...")
+                    
+                    # PRÉ-VALIDAÇÃO: Conta portas agrupadas para avisos iniciais
+                    # Usa integration_api se disponível, senão conta células '2'
+                    map_template = Path(simulator_input_dir / "map.txt").read_text()
+                    
+                    # Tenta importar integration_api para contagem correta
+                    try:
+                        import sys
+                        from pathlib import Path as P
+                        simulator_api_path = P(__file__).resolve().parents[2] / "simulador_heuristica" / "simulator"
+                        if str(simulator_api_path) not in sys.path:
+                            sys.path.insert(0, str(simulator_api_path))
+                        import integration_api
+                        door_positions = integration_api.extract_doors_from_map_text(map_template)
+                        num_doors = len(door_positions)
+                        st.info(f"Mapa contém {num_doors} portas candidatas (agrupadas)")
+                    except Exception as e:
+                        # Fallback: conta células individuais '2' como estimativa conservadora
+                        num_cells = map_template.count('2')
+                        st.warning(f"⚠️ Estimativa conservadora: ~{num_cells} células de porta (pode ser menos após agrupamento)")
+                        num_doors = num_cells  # Pior caso
+                    
+                    # Aviso/erro baseado no número de portas AGRUPADAS
+                    if num_doors > 15:
+                        st.error(f"❌ Problema muito grande: {num_doors} portas (máximo: 15)")
+                        st.error(f"Combinações possíveis: 2^{num_doors} = {2**num_doors:,}")
+                        st.error("Reduza o número de portas candidatas no mapa ou use NSGA-II")
+                        raise RuntimeError(f"Problema inviável: {num_doors} portas > 15 (limite de segurança)")
+                    elif num_doors >= 12:
+                        st.warning(f"⚠️ Problema grande: {num_doors} portas")
+                        st.warning(f"Combinações: 2^{num_doors} = {2**num_doors:,}")
+                        st.warning("A execução pode demorar alguns minutos...")
+                    else:
+                        st.success(f"✓ Problema viável: {num_doors} portas (2^{num_doors} = {2**num_doors} combinações)")
+                    
+                    # Carrega configuração (se houver) ou usa defaults
+                    config_loaded = False
+                    if config_uploaded_path:
+                        try:
+                            config_loaded = st.session_state.bruteforce_integration.load_configuration(config_uploaded_path)
+                            if config_loaded:
+                                st.success("Configuração Brute Force carregada")
+                        except Exception as e:
+                            st.warning(f"Erro ao carregar config Brute Force: {e}")
+                    
+                    if not config_loaded:
+                        st.info("Usando configuração padrão para Brute Force")
+                    
+                    # Obtém parâmetros de simulação
+                    sim_params = st.session_state.bruteforce_integration.config.get('simulation_params', {})
+                    scenario_seed = sim_params.get('scenario_seed', 42)
+                    num_scenarios = sim_params.get('num_scenarios', 20)
+                    
+                    st.info(f"Parâmetros: scenario_seed={scenario_seed}, num_scenarios={num_scenarios}")
+                    
+                    # Arquivos já foram preparados em simulator_input_dir acima
+                    # Brute Force vai ler de lá via Instance
+                    
+                    # Executa Brute Force
+                    st.info("Executando busca exaustiva com barra de progresso...")
+                    draw_mode = sim_params.get('draw_mode', False)
+                    
+                    result = st.session_state.bruteforce_integration.run_optimization(
+                        experiment_name=simulation_name,
+                        draw=draw_mode
+                    )
+                    
+                    if not result:
+                        raise RuntimeError("Brute Force não retornou resultados")
+                    
+                    # Desempacota resultado: (combinations, objectives, exits_info)
+                    pareto_combinations, pareto_objectives, exits_info = result
+                    
+                    st.success(f"✓ Brute Force concluído: {len(pareto_combinations)} soluções na fronteira de Pareto")
+                    
+                    # Salva resultados
+                    out_dir_bf = Path("uploads") / "brute_force"
+                    out_dir_bf.mkdir(parents=True, exist_ok=True)
+                    from datetime import datetime as _dt
+                    bf_file = out_dir_bf / f"results_{simulation_name}_{_dt.now().strftime('%Y%m%d_%H%M%S')}.json"
+                    st.session_state.bruteforce_integration.save_results(
+                        pareto_combinations, 
+                        pareto_objectives, 
+                        exits_info, 
+                        bf_file
+                    )
+                    st.success(f"Resultados salvos em {bf_file}")
+                    
+                    # Marca como sucesso
+                    completed_process = type("Proc", (), {"returncode": 0, "stdout": f"Brute Force concluído: {len(pareto_combinations)} soluções Pareto", "stderr": ""})()
+                
                 else:
                     # Para outros algoritmos, usa parâmetros da configuração unificada ou padrões
                     sim_params = st.session_state.get('simulation_params', {})
@@ -918,6 +1015,19 @@ if st.session_state.run_sim:
                                         st.warning("Falha ao salvar resultados NSGA-II no banco de dados.")
                             except Exception as e:
                                 st.warning(f"Erro ao salvar resultados NSGA-II: {e}")
+                        
+                        # ===== Brute Force specific results (pareto) =====
+                        if algorithm == "Força Bruta":
+                            try:
+                                if bf_file and bf_file.exists():
+                                    bf_json = bf_file.read_text()
+                                    ok_bf = st.session_state.db_integration.save_nsga_results(id_simulacao, bf_json)
+                                    if ok_bf:
+                                        st.success("Resultados Brute Force salvos no banco de dados.")
+                                    else:
+                                        st.warning("Falha ao salvar resultados Brute Force no banco de dados.")
+                            except Exception as e:
+                                st.warning(f"Erro ao salvar resultados Brute Force: {e}")
                     else:
                         st.warning("Não foi possível salvar os resultados no banco.")
                 except Exception as e:

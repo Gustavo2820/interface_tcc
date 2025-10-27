@@ -102,21 +102,36 @@ class WallMap(object):
         j : int
             Y axis position.
         """
-        if (self.structure_map.map[i - 1][j] == Constants.M_EMPTY or self.structure_map.map[i - 1][j] == Constants.M_DOOR): # TOP
+        # Use safe bounds-checked neighbor queries to avoid IndexError on map edges
+        n_rows = self.structure_map.len_row
+        n_cols = self.structure_map.len_col
+
+        def is_empty_or_door(r, c):
+            if r < 0 or r >= n_rows or c < 0 or c >= n_cols:
+                return False
+            v = self.structure_map.map[r][c]
+            return (v == Constants.M_EMPTY or v == Constants.M_DOOR)
+
+        top = is_empty_or_door(i - 1, j)
+        right = is_empty_or_door(i, j + 1)
+        bottom = is_empty_or_door(i + 1, j)
+        left = is_empty_or_door(i, j - 1)
+
+        if top:  # TOP
             walls.append([i, j, 0, Constants.D_TOP])
-        if ((self.structure_map.map[i - 1][j] == Constants.M_EMPTY or self.structure_map.map[i - 1][j] == Constants.M_DOOR) and (self.structure_map.map[i][j + 1] == Constants.M_EMPTY or self.structure_map.map[i][j + 1] == Constants.M_DOOR)): # TOP RIGHT
+        if top and right:  # TOP RIGHT
             walls.append([i, j, 0, Constants.D_TOP_RIGHT])
-        if (self.structure_map.map[i][j + 1] == Constants.M_EMPTY or self.structure_map.map[i][j + 1] == Constants.M_DOOR): # RIGHT
+        if right:  # RIGHT
             walls.append([i, j, 0, Constants.D_RIGHT])
-        if ((self.structure_map.map[i + 1][j] == Constants.M_EMPTY or self.structure_map.map[i + 1][j] == Constants.M_DOOR) and (self.structure_map.map[i][j + 1] == Constants.M_EMPTY or self.structure_map.map[i][j + 1] == Constants.M_DOOR)): # BOTTOM RIGHT
+        if bottom and right:  # BOTTOM RIGHT
             walls.append([i, j, 0, Constants.D_BOTTOM_RIGHT])
-        if (self.structure_map.map[i + 1][j] == Constants.M_EMPTY or self.structure_map.map[i + 1][j] == Constants.M_DOOR): # BOTTOM
+        if bottom:  # BOTTOM
             walls.append([i, j, 0, Constants.D_BOTTOM])
-        if ((self.structure_map.map[i + 1][j] == Constants.M_EMPTY or self.structure_map.map[i + 1][j] == Constants.M_DOOR) and (self.structure_map.map[i][j - 1] == Constants.M_EMPTY or self.structure_map.map[i][j - 1] == Constants.M_DOOR)): # BOTTOM LEFT
+        if bottom and left:  # BOTTOM LEFT
             walls.append([i, j, 0, Constants.D_BOTTOM_LEFT])
-        if (self.structure_map.map[i][j - 1] == Constants.M_EMPTY or self.structure_map.map[i][j - 1] == Constants.M_DOOR): # LEFT
+        if left:  # LEFT
             walls.append([i, j, 0, Constants.D_LEFT])
-        if ((self.structure_map.map[i - 1][j] == Constants.M_EMPTY or self.structure_map.map[i - 1][j] == Constants.M_DOOR) and (self.structure_map.map[i][j - 1] == Constants.M_EMPTY or self.structure_map.map[i][j - 1] == Constants.M_DOOR)): # TOP LEFT
+        if top and left:  # TOP LEFT
             walls.append([i, j, 0, Constants.D_TOP_LEFT])
 
     def calc_wall_field(self, walls):

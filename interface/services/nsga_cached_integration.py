@@ -15,8 +15,6 @@ Key differences from standard NSGA-II:
 - Returns 3 objectives: [num_doors, iterations, distance]
 - Uses custom crossover and mutation operators
 
-Authors:
-    Cached NSGA-II integration - 2025
 """
 
 import json
@@ -65,7 +63,12 @@ class CachedNSGAIntegration:
         self.simulator_integration = simulator_integration
         self.config = None
         self.simulation_params = {}
-        self.use_three_objectives = False  # Flag for 3-objective mode
+        # Force 3-objective cached NSGA-II mode by default.
+        # This repository's cached NSGA logic is intended to optimize
+        # [num_doors, iterations, distance]. Keep the flag true to
+        # ensure future runs always use 3-objectives regardless of
+        # incoming config files.
+        self.use_three_objectives = True  # Permanently enable 3-objective mode
     
     def load_configuration(self, config_file: Path) -> bool:
         """
@@ -91,18 +94,19 @@ class CachedNSGAIntegration:
                 self.simulation_params = config.get('simulation_params', {})
                 self.config = nsga_config
                 
-                # Check for 3-objective mode flag
-                self.use_three_objectives = nsga_config.get('use_three_objectives', False)
-                if self.use_three_objectives:
-                    logger.info("✓ 3-objective mode ENABLED (num_doors, iterations, distance)")
-                else:
-                    logger.info("Using 2-objective mode (num_doors, distance) with iterations as auxiliary")
+                # Note: we intentionally ignore incoming config flag and
+                # force 3-objective mode. Keep a log entry to make this
+                # behavior explicit.
+                self.use_three_objectives = True
+                logger.info("✓ 3-objective mode ENABLED (num_doors, iterations, distance) — forced by integration")
             else:
                 # Legacy format
                 logger.info("Detected legacy configuration format")
                 self.config = config
                 self.simulation_params = {}
-                self.use_three_objectives = config.get('use_three_objectives', False)
+                # Force 3-objective mode even for legacy configs
+                self.use_three_objectives = True
+                logger.info("✓ 3-objective mode ENABLED (num_doors, iterations, distance) — forced by integration")
             
             # Validate required keys
             required_keys = ['population_size', 'generations', 'mutation_rate']
@@ -262,13 +266,32 @@ class CachedNSGAIntegration:
                        f"mut={mutation_prob}, gen={max_generations}")
             print(f"[CACHED-NSGA] Running NSGA-II: pop={population_size}, mut={mutation_prob}, gen={max_generations}")
             
+            # Cria função de callback para atualizar progresso no Streamlit
+            import streamlit as st
+            progress_bar = st.progress(0.0)
+            status_text = st.empty()
+            
+            def progress_callback(current_gen, total_gen):
+                """Atualiza barra de progresso no Streamlit."""
+                progress = current_gen / total_gen
+                progress_bar.progress(min(progress, 1.0))
+                status_text.text(
+                    f"Geração {current_gen}/{total_gen} "
+                    f"({progress*100:.1f}%)"
+                )
+            
             results = cached_nsgaii(
                 factory=factory,
                 selector=selector,
                 population_size=population_size,
                 mutation_probability=mutation_prob,
-                max_generations=max_generations
+                max_generations=max_generations,
+                progress_callback=progress_callback
             )
+            
+            # Limpa a barra de progresso ao finalizar
+            progress_bar.empty()
+            status_text.empty()
             
             logger.info(f"DEBUG: cached_nsgaii returned: {type(results)}")
             logger.info(f"DEBUG: results length: {len(results) if results else 'None'}")

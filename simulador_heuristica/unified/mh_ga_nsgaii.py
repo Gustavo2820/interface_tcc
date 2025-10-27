@@ -126,7 +126,7 @@ def crowding_distance_assignment(front):
 
 
 def nsgaii(factory, selector, population_size, mutation_probability,
-           max_generations):
+           max_generations, progress_callback=None):
     logger.info("Initializing NSGA-II with population=%d, generations=%d", 
                 population_size, max_generations)
     
@@ -139,6 +139,11 @@ def nsgaii(factory, selector, population_size, mutation_probability,
 
     for generation in range(max_generations):
         logger.info("=== Generation %d ===", generation)
+        
+        # Atualiza progresso se callback fornecido
+        if progress_callback:
+            progress_callback(generation, max_generations)
+        
         offspring = set()
 
         while len(offspring) < population_size:
@@ -171,5 +176,9 @@ def nsgaii(factory, selector, population_size, mutation_probability,
         logger.info("Generation %d complete. Population size: %d | Pareto front size: %d",
                     generation, len(population), len(pareto[0]))
 
+    # Atualiza progresso final
+    if progress_callback:
+        progress_callback(max_generations, max_generations)
+    
     logger.info("Algorithm finished. Returning Pareto front of size %d", len(pareto[0]))
     return pareto[0]

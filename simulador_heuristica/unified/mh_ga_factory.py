@@ -56,9 +56,22 @@ class Factory(ChromosomeFactory):
         for i in range(len(gene.configuration)):
             if gene.configuration[i]:
                 doors.append(self.exits[i])
-
+        # If no doors are selected, reject/penalize this gene to avoid 0-distance artifacts.
         iters = []
         distances = []
+        if len(doors) == 0:
+            # Penalty: mark as max iterations and a large distance so GA will avoid this solution.
+            PENALTY_DISTANCE = 1e9
+            MAX_ITERS = Simulator.MAX_ITERATIONS if hasattr(Simulator, 'MAX_ITERATIONS') else 1000
+            # If multiple scenario seeds are present, apply same penalty to all
+            num_seeds = max(1, len(self.instance.scenario_seed) if hasattr(self.instance, 'scenario_seed') else 1)
+            iters = [MAX_ITERS] * num_seeds
+            distances = [PENALTY_DISTANCE] * num_seeds
+            avg_iters = sum(iters) / len(iters)
+            avg_dist = sum(distances) / len(distances)
+            print(f"Decode penalty applied - Portas: 0, Iters: {avg_iters}, Dist: {avg_dist}")
+            return 0, avg_iters, avg_dist
+
         scen = Scenario(self.instance.experiment, doors, self.instance.draw,
                             self.instance.scenario_seed[0], self.instance.simulation_seed)
         simulator = Simulator(scen)

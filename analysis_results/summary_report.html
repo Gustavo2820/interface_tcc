@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Simulation disagreement report</title>
+  <style>
+    body{font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial;margin:24px;color:#111}
+    h1{margin-bottom:6px}
+    .row{display:flex;gap:16px;align-items:flex-start}
+    .card{border:1px solid #ddd;padding:12px;border-radius:6px;background:#fff}
+    table{border-collapse:collapse;width:100%;margin-top:12px}
+    th,td{border:1px solid #eee;padding:6px;text-align:left}
+    th{background:#f7f7f7}
+    .small{font-size:0.9rem;color:#555}
+    img.thumb{max-width:360px;border:1px solid #ccc}
+    a.file{color:#0b63c6}
+  </style>
+</head>
+<body>
+  <h1>Simulation disagreement summary</h1>
+  <p class="small">This report compares per-iteration distance traces from the <code>unified</code> simulator and the CLI <code>simulador_heuristica.simulator</code> runs. Files used are under the <code>analysis_results/</code> folder in the project.</p>
+
+  <div class="row">
+    <div class="card" style="flex:1">
+      <h2>Available artifacts</h2>
+      <ul>
+        <li><a class="file" href="comparison_summary.json">comparison_summary.json</a> — aggregated metrics per seed.</li>
+        <li><a class="file" href="comparison_ratios.csv">comparison_ratios.csv</a> — unified/CLI distance ratios per seed.</li>
+        <li><a class="file" href="disagreement_summary.csv">disagreement_summary.csv</a> — RMSE/MAE per seed (aligned series).</li>
+        <li><a class="file" href="top_disagreement_report.json">top_disagreement_report.json</a> — top seeds diagnostics (JSON).</li>
+        <li>Per-seed files:
+          <ul>
+            <li>Unified series: <code>unified_seed_&lt;n&gt;.json</code></li>
+            <li>CLI series: <code>cli_seed_&lt;n&gt;.json</code></li>
+            <li>Detail CSVs: <code>detail_seed_&lt;n&gt;.csv</code></li>
+            <li>Overlay plots: <code>plots_overlay/overlay_seed_&lt;n&gt;.png</code></li>
+          </ul>
+        </li>
+      </ul>
+    </div>
+    <div class="card" style="width:420px">
+      <h2>Quick actions</h2>
+      <ol>
+        <li>Open overlay images: <code>analysis_results/plots_overlay/</code></li>
+        <li>Open per-seed detail CSVs for top seeds: <code>analysis_results/detail_seed_*.csv</code></li>
+        <li>To reproduce: run the CLI as described in the repository README (or run <code>python -m simulador_heuristica.simulator.main -e sim_mapa3 -m &lt;seed&gt; -s &lt;seed&gt;</code>).</li>
+      </ol>
+    </div>
+  </div>
+
+  <h2>Top disagreement seeds (interactive)</h2>
+  <div id="top-table" class="card small">Loading summary...</div>
+
+  <h2>Overlay thumbnails</h2>
+  <div id="thumbnails" class="card small">Loading thumbnails...</div>
+
+  <script>
+    // Embedded JSON to make this report work when opened via file://
+    // These variables are populated at build time from analysis_results/*.json
+    const EMBED_TOP = [
+      {
+        "seed": 9,
+        "aligned_len": 27,
+        "rmse": 2.6260642685744195,
+        "mae": 1.8572469972280774,
+        "max_abs_diff": 6.5,
+        "max_abs_diff_iteration": 26,
+        "detail_csv": "/home/gustavool/dev/interface_tcc/analysis_results/detail_seed_9.csv"
+      },
+      {
+        "seed": 18,
+        "aligned_len": 58,
+        "rmse": 2.325540359930198,
+        "mae": 1.7543325349993708,
+        "max_abs_diff": 6.0,
+        "max_abs_diff_iteration": 25,
+        "detail_csv": "/home/gustavool/dev/interface_tcc/analysis_results/detail_seed_18.csv"
+      },
+      {
+        "seed": 8,
+        "aligned_len": 21,
+        "rmse": 2.0048734280595495,
+        "mae": 1.4312518865150443,
+        "max_abs_diff": 6.333333333333333,
+        "max_abs_diff_iteration": 20,
+        "detail_csv": "/home/gustavool/dev/interface_tcc/analysis_results/detail_seed_8.csv"
+      },
+      {
+        "seed": 13,
+        "aligned_len": 21,
+        "rmse": 1.6361882251831712,
+        "mae": 1.2021806635998364,
+        "max_abs_diff": 4.0,
+        "max_abs_diff_iteration": 20,
+        "detail_csv": "/home/gustavool/dev/interface_tcc/analysis_results/detail_seed_13.csv"
+      },
+      {
+        "seed": 6,
+        "aligned_len": 20,
+        "rmse": 1.549849046788248,
+        "mae": 1.151695583613153,
+        "max_abs_diff": 4.666666666666667,
+        "max_abs_diff_iteration": 19,
+        "detail_csv": "/home/gustavool/dev/interface_tcc/analysis_results/detail_seed_6.csv"
+      }
+    ];
+
+    const EMBED_COMP = [
+      {
+        "seed": 1,
+        "unified_iters": 83,
+        "unified_dist": 3525.2668592436976,
+        "unified_time_s": 0.03410506248474121,
+        "unified_series_len": 83,
+        "cli_returncode": 0,
+        "cli_time_s": 0.81626296043396,
+        "cli_stdout_snippet": "0\n1\n2\n3\n4\n5\n6\n7\n8\n9\n10\n11\n12\n13\n14\n15\n16\n17\n18\n19\n20\n21\n22\n23\n24\n25\n26\n27\n28\n29\n30\n31\n32\n33\n34\n35\n36\n37\n38\n39\n40\n41\n42\n43\n44\n45\n46\n47\n48\n49\n50\n51\n52\n53\n54\n55\n56\n57\n",
+        "cli_stderr_snippet": "2025-10-27 08:40:22,972 INFO simulator: qtd iteracoes 58\n2025-10-27 08:40:22,972 INFO simulator: qtd distancia 1764.739623397436\n2025-10-27 08:40:22,973 DEBUG simulator: metrics.json written to /home/",
+        "cli_iters": 58.0,
+        "cli_dist": 1764.739623397436,
+        "pkg_error": "attempted relative import with no known parent package",
+        "cli_series_len": 58
+      },
+      {
+        "seed": 2,
+        "unified_iters": 413,
+        "unified_dist": 92898.7951486014,
+        "unified_time_s": 0.14175081253051758,
+        "unified_series_len": 413,
+        "cli_returncode": 0,
+        "cli_time_s": 2.2592687606811523,
+        "cli_stdout_snippet": "0\n1\n2\n3\n4\n5\n6\n7\n8\n9\n10\n11\n12\n13\n14\n15\n16\n17\n18\n19\n20\n21\n22\n23\n24\n25\n26\n27\n28\n29\n30\n31\n32\n33\n34\n35\n36\n37\n38\n39\n40\n41\n42\n43\n44\n45\n46\n47\n48\n49\n50\n51\n52\n53\n54\n55\n56\n57\n58\n59\n60\n61\n62\n63\n64\n65\n66\n67\n68\n69\n",
+        "cli_stderr_snippet": "2025-10-27 08:40:25,381 INFO simulator: qtd iteracoes 200\n2025-10-27 08:40:25,381 INFO simulator: qtd distancia 21542.861397058823\n2025-10-27 08:40:25,382 DEBUG simulator: metrics.json written to /hom",
+        "cli_iters": 200.0,
+        "cli_dist": 21542.861397058823,
+        "pkg_error": "attempted relative import with no known parent package",
+        "cli_series_len": 200
+      },
+      {
+        "seed": 3,
+        "unified_iters": 28,
+        "unified_dist": 453.25795454545454,
+        "unified_time_s": 0.009907245635986328,
+        "unified_series_len": 28,
+        "cli_returncode": 0,
+        "cli_time_s": 0.8767719268798828,
+        "cli_stdout_snippet": "0\n1\n2\n3\n4\n5\n6\n7\n8\n9\n10\n11\n12\n13\n14\n15\n16\n17\n18\n19\n20\n21\n22\n23\n24\n25\n26\n27\n28\n29\n30\n31\n32\n33\n34\n35\n36\n37\n38\n39\n40\n41\n42\n43\n44\n45\n46\n47\n48\n49\n50\n51\n52\n53\n54\n55\n56\n57\n58\n59\n60\n61\n62\n63\n64\n65\n66\n67\n",
+        "cli_stderr_snippet": "2025-10-27 08:40:26,271 INFO simulator: qtd iteracoes 68\n2025-10-27 08:40:26,271 INFO simulator: qtd distancia 2470.3493630144367\n2025-10-27 08:40:26,271 DEBUG simulator: metrics.json written to /home",
+        "cli_iters": 68.0,
+        "cli_dist": 2470.3493630144367,
+        "pkg_error": "attempted relative import with no known parent package",
+        "cli_series_len": 68
+      }
+      /* truncated in-HTML embed to keep file size small; full comparison_summary.json exists on disk */
+    ];
+
+    async function loadJSON(path){
+      try{
+        const resp = await fetch(path);
+        if(!resp.ok) throw new Error('HTTP '+resp.status);
+        return await resp.json();
+      }catch(e){
+        return null;
+      }
+    }
+
+    (async ()=>{
+      const top = (typeof EMBED_TOP !== 'undefined' && EMBED_TOP) ? EMBED_TOP : await loadJSON('top_disagreement_report.json');
+      const comp = (typeof EMBED_COMP !== 'undefined' && EMBED_COMP) ? EMBED_COMP : await loadJSON('comparison_summary.json');
+      const div = document.getElementById('top-table');
+      const thumbs = document.getElementById('thumbnails');
+
+      if(!top){
+        div.innerHTML = '<p class="small">top_disagreement_report.json not available or blocked by browser file access. Open files directly in the editor: <code>analysis_results/top_disagreement_report.json</code>.</p>';
+      } else {
+        let html = '<table><thead><tr><th>seed</th><th>aligned_len</th><th>rmse</th><th>mae</th><th>max_abs</th><th>max_iter</th><th>detail CSV</th><th>overlay</th></tr></thead><tbody>';
+        for(const s of top){
+          const seed = s.seed;
+          const csv = s.detail_csv || ('detail_seed_'+seed+'.csv');
+          const overlay = 'plots_overlay/overlay_seed_'+seed+'.png';
+          const rmseStr = (s.rmse===null||s.rmse===undefined)? '':(Number.isFinite(s.rmse)? s.rmse.toFixed(4): s.rmse);
+          const maeStr = (s.mae===null||s.mae===undefined)? '':(Number.isFinite(s.mae)? s.mae.toFixed(4): s.mae);
+          html += `<tr><td>${seed}</td><td>${s.aligned_len}</td><td>${rmseStr}</td><td>${maeStr}</td><td>${(s.max_abs_diff||'')}</td><td>${(s.max_abs_diff_iteration||'')}</td><td><a href="${csv}">${csv.split('/').pop()}</a></td><td><a href="${overlay}"><img class="thumb" src="${overlay}" alt="seed ${seed}"></a></td></tr>`;
+        }
+        html += '</tbody></table>';
+        div.innerHTML = html;
+      }
+
+      // thumbnails grid for all overlays
+      if(comp){
+        let g = '<div style="display:flex;flex-wrap:wrap;gap:12px">';
+        for(const e of comp){
+          const seed = e.seed;
+          const overlay = 'plots_overlay/overlay_seed_'+seed+'.png';
+          const uiters = e.unified_iters||'';
+          const citers = e.cli_iters||'';
+          g += `<div style="width:320px"><div style="font-size:0.9rem;margin-bottom:6px">seed ${seed} — unified iters=${uiters} cli iters=${citers}</div><a href="${overlay}"><img class="thumb" src="${overlay}" alt="seed ${seed}"></a></div>`;
+        }
+        g += '</div>';
+        thumbs.innerHTML = g;
+      } else {
+        thumbs.innerHTML = '<p class="small">comparison_summary.json not available for interactive thumbnails; open <code>analysis_results/plots_overlay/</code>.</p>';
+      }
+    })();
+  </script>
+
+</body>
+</html>

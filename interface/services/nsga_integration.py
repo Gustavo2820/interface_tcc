@@ -56,6 +56,7 @@ try:
     print("DEBUG: Importando pymoo...")
     from pymoo.algorithms.moo.nsga2 import NSGA2
     from pymoo.core.problem import Problem
+    from pymoo.core.callback import Callback
     from pymoo.optimize import minimize
     from pymoo.operators.sampling.rnd import BinaryRandomSampling
     from pymoo.operators.crossover.hux import HalfUniformCrossover
@@ -106,6 +107,47 @@ if Problem is None:
             raise NotImplementedError
 
 
+class StreamlitProgressCallback(Callback):
+    """
+    Callback do pymoo para atualizar barra de progresso no Streamlit.
+    
+    Monitora o progresso da otimização NSGA-II e atualiza a interface
+    do Streamlit com informações sobre a geração atual.
+    """
+    
+    def __init__(self, max_generations: int):
+        """
+        Inicializa o callback.
+        
+        Args:
+            max_generations: Número total de gerações
+        """
+        super().__init__()
+        self.max_generations = max_generations
+        self.progress_bar = st.progress(0.0)
+        self.status_text = st.empty()
+    
+    def notify(self, algorithm):
+        """
+        Chamado a cada geração pela otimização do pymoo.
+        
+        Args:
+            algorithm: Instância do algoritmo NSGA-II
+        """
+        current_gen = algorithm.n_gen
+        progress = current_gen / self.max_generations
+        
+        # Atualiza barra de progresso
+        self.progress_bar.progress(min(progress, 1.0))
+        
+        # Atualiza texto de status
+        pop_size = len(algorithm.pop) if hasattr(algorithm, 'pop') and algorithm.pop is not None else 0
+        self.status_text.text(
+            f"Geração {current_gen}/{self.max_generations} "
+            f"({progress*100:.1f}%) - População: {pop_size}"
+        )
+
+
 class EvacuationProblem(Problem):
     """
     Problema de evacuação para pymoo NSGA-II.
@@ -131,11 +173,11 @@ class EvacuationProblem(Problem):
         self.door_positions = door_positions
         self.simulation_params = simulation_params or {}
         self.evaluation_count = 0
-    # Define um problema com 2 objetivos e n variáveis binárias (uma para cada posição de porta)
-    # Objetivos (legacy adjusted): [num_doors, distance]
+        # Define um problema com 3 objetivos e n variáveis binárias (uma para cada posição de porta)
+        # Objetivos: [num_doors, iterations, distance] (alinhado com z_experiment1_audition.py)
         # initialize base Problem now that self.door_positions is set
         n_var = len(self.door_positions)
-        super().__init__(n_var=n_var, n_obj=2, n_constr=0, xl=0, xu=1, type_var=bool)
+        super().__init__(n_var=n_var, n_obj=3, n_constr=0, xl=0, xu=1, type_var=bool)
     
     def _evaluate(self, x, out, *args, **kwargs):
         """
@@ -153,23 +195,23 @@ class EvacuationProblem(Problem):
         except Exception:
             logger.exception("Failed to convert evaluation results to array")
             # do not invent values; fail safe by assigning large penalty but log as ERROR
-            results = np.full((len(x), 2), 1e6, dtype=float)
+            results = np.full((len(x), 3), 1e6, dtype=float)
 
-        # Normalize shape to (pop_size, 2)
-        if results.ndim == 1 and results.size == 2:
+        # Normalize shape to (pop_size, 3)
+        if results.ndim == 1 and results.size == 3:
             results = np.tile(results, (len(x), 1))
-        elif results.ndim == 1 and results.size != 2:
+        elif results.ndim == 1 and results.size != 3:
             # Unexpected shape, set penalties
             logger.debug(f"Unexpected evaluation shape {results.shape}, applying penalties")
-            results = np.full((len(x), 2), 1e6, dtype=float)
-        elif results.ndim == 2 and results.shape[1] != 2:
+            results = np.full((len(x), 3), 1e6, dtype=float)
+        elif results.ndim == 2 and results.shape[1] != 3:
             # If more/less objectives returned, try to truncate or pad
-            logger.debug(f"Evaluation returned {results.shape[1]} objectives per individual; adjusting to 2")
-            if results.shape[1] > 2:
-                results = results[:, :2]
+            logger.debug(f"Evaluation returned {results.shape[1]} objectives per individual; adjusting to 3")
+            if results.shape[1] > 3:
+                results = results[:, :3]
             else:
                 # pad with penalty
-                pad = np.full((results.shape[0], 2 - results.shape[1]), 1e6, dtype=float)
+                pad = np.full((results.shape[0], 3 - results.shape[1]), 1e6, dtype=float)
                 results = np.hstack([results, pad])
 
         # Sanitize non-finite values
@@ -194,11 +236,20 @@ class EvacuationProblem(Problem):
         Args:
             gene: Vetor binário representando quais portas usar
             
-            Returns:
+        Returns:
             Lista com os valores dos 3 objetivos na ordem [num_doors, iterations, distance]
         """
         # Decode gene and prepare experiment directory and files
         door_positions = self._decode_gene(gene)
+        
+        # CRITICAL: Penalize solutions with zero doors (invalid/nonsensical)
+        # Zero doors means no evacuation paths, leading to artificially low distance (0)
+        # which pollutes the Pareto front with invalid solutions.
+        if not door_positions or len(door_positions) == 0:
+            logger.warning("Gene selected 0 doors - applying heavy penalty to prevent invalid Pareto solutions")
+            # Return maximum penalty for all objectives
+            # Use a recognizable large value that clearly marks this as invalid
+            return [0.0, 1e6, 1e6]
 
         experiment_name = f"nsga_eval_{self.evaluation_count}"
         self.evaluation_count += 1
@@ -256,7 +307,7 @@ class EvacuationProblem(Problem):
             if results.get("error"):
                 logger.error("read_results returned error for %s: %s", experiment_name, results.get('error'))
                 # No invented values: return explicit penalty but log for audit
-                return [1e6, 1e6]
+                return [1e6, 1e6, 1e6]
 
             # num_doors should reflect number of selected door *configurations* (grouped doors)
             # If door_positions contains door dicts (from extract_doors_info), count them; otherwise count tuples
@@ -265,30 +316,37 @@ class EvacuationProblem(Problem):
             else:
                 num_doors = len(door_positions)
 
-            # Extract numeric objective distance (and optionally num_doors) from results
+            # Extract numeric objectives [num_doors, iterations, distance] from results
             obj = self._extract_objectives(results, stdout=stdout, stderr=stderr, num_doors=num_doors)
 
-            # _extract_objectives returns [num_doors, distance]
+            # _extract_objectives returns [num_doors, iterations, distance]
             try:
                 num_doors_val = float(obj[0]) if obj and obj[0] is not None else float(num_doors)
             except Exception:
                 num_doors_val = float(num_doors)
             try:
-                distance_val = float(obj[1]) if obj and obj[1] is not None else None
+                iterations_val = float(obj[1]) if obj and len(obj) > 1 and obj[1] is not None else None
+            except Exception:
+                iterations_val = None
+            try:
+                distance_val = float(obj[2]) if obj and len(obj) > 2 and obj[2] is not None else None
             except Exception:
                 distance_val = None
 
-            # Do not penalize iterations (auxiliary metric). Only penalize distance if missing
+            # Penalize missing metrics
+            if iterations_val is None or not np.isfinite(iterations_val):
+                logger.warning("Missing or non-finite iterations for %s, applying penalty", experiment_name)
+                iterations_val = 1e6
             if distance_val is None or not np.isfinite(distance_val):
                 logger.warning("Missing or non-finite distance for %s, applying penalty", experiment_name)
                 distance_val = 1e6
 
-            # Return objectives as floats: [num_doors, distance]
-            return [float(num_doors_val), float(distance_val)]
+            # Return objectives as floats: [num_doors, iterations, distance]
+            return [float(num_doors_val), float(iterations_val), float(distance_val)]
 
         except Exception as e:
             logger.exception("Exception during evaluation of experiment %s", experiment_name)
-            return [1e6, 1e6]
+            return [1e6, 1e6, 1e6]
 
         finally:
             # Clean up temporary staging directory
@@ -402,30 +460,43 @@ class EvacuationProblem(Problem):
     def _extract_objectives(self, results: Dict, stdout: Optional[str] = None, stderr: Optional[str] = None, num_doors: Optional[int] = None) -> List[Optional[float]]:
         """
         Extrai as métricas de interesse a partir do dicionário retornado por `read_results`.
-        Para compatibilidade com os experiments legacy, procura preferencialmente por:
-        - 'distancia' / 'distance' / 'qtdDistance' / 'distancia_total' -> distance objective
+        
+        Procura por:
+        - 'iterations' / 'tempo_total' / 'qtd_iteracoes' -> iterations objective
+        - 'distance' / 'distancia' / 'qtdDistance' / 'distancia_total' -> distance objective
 
-        Nota: 'iterations' é considerada uma métrica auxiliar e NÃO é tratada como objetivo.
-
-        Retorna uma lista com dois elementos: [num_doors, distance]. num_doors pode ser fornecido
-        pelo chamador (a partir do gene) e será usado por preferência; caso contrário, retornará None
-        no primeiro elemento.
+        Retorna uma lista com três elementos: [num_doors, iterations, distance].
+        num_doors pode ser fornecido pelo chamador (a partir do gene).
         """
         try:
-            # Fast path: results already contain metrics
+            # Fast path: results already contain metrics at top level
             if isinstance(results, dict):
-                # If explicit metrics already present as top-level numeric keys, prefer distance keys
+                # Try to find iterations and distance at top level
+                iterations_keys = ['iterations', 'tempo_total', 'qtd_iteracoes', 'iters', 'total_time']
                 distance_keys = ['distance', 'avg_distance', 'qtdDistance', 'qtd_distancia', 'qtd_distance', 'distancia', 'total_distance', 'distancia_total']
+                
+                i_key = next((k for k in iterations_keys if k in results), None)
                 d_key = next((k for k in distance_keys if k in results), None)
+                
+                i_val = None
                 d_val = None
+                
+                if i_key:
+                    try:
+                        i_val = float(results[i_key])
+                    except Exception:
+                        i_val = None
+                
                 if d_key:
                     try:
                         d_val = float(results[d_key])
                     except Exception:
                         d_val = None
-                    # num_doors preference: take provided num_doors if available
+                
+                # If we found both at top level, return early
+                if i_val is not None and d_val is not None:
                     nd = float(num_doors) if num_doors is not None else None
-                    return [nd, d_val]
+                    return [nd, i_val, d_val]
 
                 # If a metrics file list is provided, try to open the first JSON containing keys
                 metrics_candidates = results.get('metrics') or []
@@ -447,49 +518,72 @@ class EvacuationProblem(Problem):
                             continue
                         with open(candidate_path, 'r') as fh:
                             data = json.load(fh)
-                        # Accept nested structures: try explicit distance key names (including legacy keys)
+                        
+                        # Try to find iterations
+                        i_key = next((k for k in ('iterations','tempo_total','qtd_iteracoes','iters','total_time') if k in data), None)
+                        i_val = None
+                        if i_key:
+                            try:
+                                i_val = float(data[i_key])
+                            except Exception:
+                                i_val = None
+                        
+                        # Try to find distance
                         d_key = next((k for k in ('distance','avg_distance','qtdDistance','qtd_distancia','qtd_distance','distancia','total_distance','distancia_total') if k in data), None)
+                        d_val = None
                         if d_key:
                             try:
                                 d_val = float(data[d_key])
                             except Exception:
                                 d_val = None
+                        
+                        # If both found, return
+                        if i_val is not None and d_val is not None:
                             nd = float(num_doors) if num_doors is not None else None
-                            return [nd, d_val]
-                        # also check under a 'metrics' object
-                        # also check under a 'metrics' object for distance
+                            return [nd, i_val, d_val]
+                        
+                        # Also check under a nested 'metrics' object
                         if 'metrics' in data and isinstance(data['metrics'], dict):
-                            d_key = next((k for k in ('distance','avg_distance','qtdDistance','qtd_distancia','qtd_distance','distancia','total_distance','distancia_total') if k in data['metrics']), None)
-                            if d_key:
-                                try:
-                                    d_val = float(data['metrics'][d_key])
-                                except Exception:
-                                    d_val = None
+                            if i_val is None:
+                                i_key = next((k for k in ('iterations','tempo_total','qtd_iteracoes','iters','total_time') if k in data['metrics']), None)
+                                if i_key:
+                                    try:
+                                        i_val = float(data['metrics'][i_key])
+                                    except Exception:
+                                        i_val = None
+                            
+                            if d_val is None:
+                                d_key = next((k for k in ('distance','avg_distance','qtdDistance','qtd_distancia','qtd_distance','distancia','total_distance','distancia_total') if k in data['metrics']), None)
+                                if d_key:
+                                    try:
+                                        d_val = float(data['metrics'][d_key])
+                                    except Exception:
+                                        d_val = None
+                            
+                            if i_val is not None and d_val is not None:
                                 nd = float(num_doors) if num_doors is not None else None
-                                return [nd, d_val]
+                                return [nd, i_val, d_val]
                     except Exception as e:
                         logger.debug(f"Failed to parse metrics candidate {candidate}: {e}")
 
-                # If nothing found in metrics files, try parsing raw stdout/stderr for explicit printed time/distance
+                # If nothing found in metrics files, try parsing raw stdout/stderr
                 if stdout:
                     try:
-                        s_time = None
+                        s_iters = None
                         s_dist = None
                         for line in str(stdout).splitlines():
-                            line = line.strip().lower()
-                            # Look for explicit time lines
-                            if 'tempo' in line and any(tok in line for tok in ('tempo','time')):
-                                # attempt to parse a float from the line
+                            line_lower = line.strip().lower()
+                            # Look for iterations/tempo lines
+                            if any(tok in line_lower for tok in ('tempo','time','iteracoes','iterations','iters')):
                                 parts = line.replace(',', '.').split()
                                 for p in reversed(parts):
                                     try:
-                                        s_time = float(p)
+                                        s_iters = float(p)
                                         break
                                     except Exception:
                                         continue
-                            # Look for explicit distance lines
-                            # also capture legacy printed tokens like 'qtdDistance' or 'qtd distancia'
-                            if 'dist' in line or 'distância' in line or 'distance' in line or 'qtd' in line:
+                            # Look for distance lines
+                            if any(tok in line_lower for tok in ('dist','distância','distance','qtd')):
                                 parts = line.replace(',', '.').split()
                                 for p in reversed(parts):
                                     try:
@@ -497,10 +591,10 @@ class EvacuationProblem(Problem):
                                         break
                                     except Exception:
                                         continue
-                        # prefer distance parsing from stdout
-                        if s_dist is not None:
+                        
+                        if s_iters is not None and s_dist is not None:
                             nd = float(num_doors) if num_doors is not None else None
-                            return [nd, float(s_dist)]
+                            return [nd, float(s_iters), float(s_dist)]
                     except Exception as e:
                         logger.debug(f"Failed to parse stdout for metrics: {e}")
 
@@ -511,11 +605,13 @@ class EvacuationProblem(Problem):
                 logger.debug(f"Simulator stdout snippet: {str(stdout)[:1000]}")
             if stderr:
                 logger.debug(f"Simulator stderr snippet: {str(stderr)[:1000]}")
-            return [None, None]
+            nd = float(num_doors) if num_doors is not None else None
+            return [nd, None, None]
 
         except Exception as e:
             logger.exception(f"Exception while extracting objectives: {e}")
-            return [None, None]
+            nd = float(num_doors) if num_doors is not None else None
+            return [nd, None, None]
 
 
 
@@ -848,14 +944,22 @@ class NSGAIntegration:
             print(f"  - generations: {self.config['generations']}")
             print(f"  - mutation_rate: {self.config['mutation_rate']}")
             
+            # Cria callback para atualizar progresso no Streamlit
+            progress_callback = StreamlitProgressCallback(self.config['generations'])
+            
             # Executa a otimização usando pymoo
             res = minimize(
                 self.problem,
                 self.algorithm,
                 termination=('n_gen', self.config['generations']),
                 seed=1,
+                callback=progress_callback,
                 verbose=True
             )
+            
+            # Limpa a barra de progresso ao finalizar
+            progress_callback.progress_bar.empty()
+            progress_callback.status_text.empty()
             
             print(f"DEBUG: Otimização concluída")
             print(f"  - Soluções encontradas: {len(res.X)}")
@@ -959,7 +1063,7 @@ class NSGAIntegration:
                             }
                         door_positions.append(dp)
 
-                # Objectives expected to be [num_doors, distance] (2 elements)
+                # Objectives expected to be [num_doors, iterations, distance] (3 elements)
                 # Convert numpy arrays to native lists if necessary
                 try:
                     obj_list = objectives.tolist()
@@ -967,37 +1071,17 @@ class NSGAIntegration:
                     # if objectives is a list/tuple
                     obj_list = list(objectives)
 
-                # Ensure the objectives array length is 2
-                if len(obj_list) > 2:
-                    obj_list = obj_list[:2]
-                elif len(obj_list) < 2:
-                    # pad missing distance with None (caller/consumer may apply penalties)
-                    obj_list = obj_list + [None] * (2 - len(obj_list))
+                # Ensure the objectives array length is 3
+                if len(obj_list) > 3:
+                    obj_list = obj_list[:3]
+                elif len(obj_list) < 3:
+                    # Pad with None if we somehow got fewer objectives
+                    obj_list = obj_list + [None] * (3 - len(obj_list))
 
-                # attempt to get auxiliary iterations value from per-eval metrics if available
-                aux_iterations = None
-                try:
-                    # some result objects embed auxiliary info; otherwise will be filled during aggregation
-                    aux_iterations = getattr(objectives, 'iterations', None)
-                except Exception:
-                    aux_iterations = None
-
-                # If no auxiliary iterations found on the objectives object, try reading
-                # the per-eval metrics file produced by the simulator for this evaluation.
-                # The simulator writes metrics to simulador_heuristica/output/nsga_eval_<id>/metrics.json
-                if aux_iterations is None:
-                    try:
-                        base_output = Path(self.simulator_integration.output_path)
-                        eval_dir = base_output / f'nsga_eval_{i}'
-                        metrics_file = eval_dir / 'metrics.json'
-                        if metrics_file.exists():
-                            try:
-                                md = json.loads(metrics_file.read_text())
-                                aux_iterations = md.get('iterations') or md.get('qtd_iteracoes') or md.get('iters') or md.get('tempo_total')
-                            except Exception:
-                                aux_iterations = None
-                    except Exception:
-                        aux_iterations = None
+                # Extract num_doors, iterations, distance from the 3-objective array
+                num_doors = obj_list[0]
+                iterations = obj_list[1]
+                distance = obj_list[2]
 
                 # Build expanded per-cell door coordinates from grouped/tuple representations.
                 # OFFICIAL INTEGRATION: Use integration_api.expand_grouped_doors
@@ -1053,7 +1137,8 @@ class NSGAIntegration:
                     "door_positions_grouped": _to_native(door_positions),
                     "objectives": _to_native(obj_list),
                     "num_doors": int(int(sum(solution))),
-                    "iterations": int(aux_iterations) if aux_iterations is not None else None
+                    "iterations": int(iterations) if iterations is not None else None,
+                    "distance": float(distance) if distance is not None else None
                 }
                 results.append(res_obj)
 

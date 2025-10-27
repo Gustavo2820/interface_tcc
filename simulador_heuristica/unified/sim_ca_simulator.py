@@ -66,9 +66,29 @@ class Simulator(object):
 
             # Save people
             self.log.saveIterationDistances(self.individuals, self.static_map)
+            # Save non-evacuated counts for this iteration
+            try:
+                non_evacuated = sum(1 for ind in self.individuals if not ind.evacuated)
+                self.log.per_iteration_non_evacuated.append(int(non_evacuated))
+            except Exception:
+                try:
+                    self.log.per_iteration_non_evacuated = [int(sum(1 for ind in self.individuals if not ind.evacuated))]
+                except Exception:
+                    pass
 
         if self.draw:
             self.log.generateHTML(self.draw_path, self.iteration, len(self.individuals), 1)
+
+        # Determine termination reason
+        try:
+            if self.check_evacuated_individuals():
+                self.log.termination_reason = 'evacuated'
+            elif self.iteration >= self.MAX_ITERATIONS:
+                self.log.termination_reason = 'max_iterations'
+            else:
+                self.log.termination_reason = 'unknown'
+        except Exception:
+            self.log.termination_reason = None
 
         return self.iteration, self.log.calculateDistances()
 

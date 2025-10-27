@@ -5,6 +5,10 @@ class Logs(object):
     
     def __init__(self):
         self.individualsDistances = []
+        # number of non-evacuated individuals per iteration
+        self.per_iteration_non_evacuated = []
+        # reason the simulation terminated: 'evacuated' | 'max_iterations' | 'stagnation' | None
+        self.termination_reason = None
 
     def generateHTML(self, directory, tempoGasto, qtdIndividuos, qtdMapas):
         arquivo = open(directory+'/index.html', 'w')

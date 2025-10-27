@@ -100,6 +100,13 @@ if __name__ == "__main__":
         metrics = {
             "tempo_total": float(iterations),
             "distancia_total": float(qtdDistance),
+            # Per-iteration export: list of average distances of non-evacuated individuals
+            # This helps downstream integrations compare time-series between runs.
+            "individuals_distances": list(getattr(simulator.log, 'individualsDistances', [])),
+            # number of non-evacuated individuals per iteration (for diagnosing stagnation)
+            "per_iteration_non_evacuated": list(getattr(simulator.log, 'per_iteration_non_evacuated', [])),
+            # termination reason: 'evacuated' | 'max_iterations' | 'stagnation' | None
+            "termination_reason": getattr(simulator.log, 'termination_reason', None),
             "algorithm": "simulator",
             "scenario_seed": int(args.scenario_seed or 0),
             "simulation_seed": int(args.simulation_seed or 0)
