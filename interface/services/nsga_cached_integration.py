@@ -22,6 +22,7 @@ import sys
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 import numpy as np
+import streamlit as st
 
 from .logger import default_log as logger
 
@@ -153,17 +154,21 @@ class CachedNSGAIntegration:
         elif not isinstance(scenario_seed, list):
             scenario_seed = [scenario_seed]
         
+        # Instance expects a single seed, not a list - use first seed
+        first_scenario_seed = scenario_seed[0] if scenario_seed else 0
+        
         if simulation_seed is None:
             simulation_seed = self.simulation_params.get('simulation_seed', 0)
         
         max_iterations = self.simulation_params.get('max_iterations')
         
+        # Instance uses positional arguments
         return Instance(
-            experiment=experiment_name,
-            draw=draw,
-            scenario_seed=scenario_seed,
-            simulation_seed=simulation_seed,
-            max_iterations=max_iterations
+            experiment_name,
+            draw,
+            first_scenario_seed,
+            simulation_seed,
+            max_iterations
         )
     
     def run_optimization(
@@ -218,15 +223,19 @@ class CachedNSGAIntegration:
             if not isinstance(scenario_seed, list):
                 scenario_seed = [scenario_seed]
             
+            # Instance expects a single seed, not a list - use first seed
+            first_scenario_seed = scenario_seed[0] if scenario_seed else 0
+            
             simulation_seed = self.simulation_params.get('simulation_seed', 0)
             max_iterations = self.simulation_params.get('max_iterations')
             
+            # Instance uses positional arguments
             instance = Instance(
-                experiment=experiment_name,
-                draw=draw,
-                scenario_seed=scenario_seed,
-                simulation_seed=simulation_seed,
-                max_iterations=max_iterations
+                experiment_name,
+                draw,
+                first_scenario_seed,
+                simulation_seed,
+                max_iterations
             )
             
             # Create factory with caching
@@ -240,7 +249,6 @@ class CachedNSGAIntegration:
             logger.info(f"Starting cached NSGA-II: pop={population_size}, gen={max_generations}")
             
             # Cria componentes de progresso no Streamlit
-            import streamlit as st
             progress_bar = st.progress(0.0)
             status_text = st.empty()
             

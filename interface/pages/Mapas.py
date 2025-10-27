@@ -79,12 +79,6 @@ st.markdown("""
     }
     
     /* ===== CARDS DE MAPAS ===== */
-    .mapa-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-        gap: 24px;
-        margin-top: 2rem;
-    }
     .mapa-card {
         background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
         border-radius: 12px;
@@ -92,6 +86,7 @@ st.markdown("""
         border: 2px solid rgba(102, 126, 234, 0.3);
         transition: 0.3s ease-in-out;
         box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        height: 100%;
     }
     .mapa-card:hover {
         transform: translateY(-5px);
@@ -107,13 +102,17 @@ st.markdown("""
         image-rendering: -webkit-optimize-contrast;
         image-rendering: crisp-edges;
         image-rendering: pixelated;
+        background: rgba(0, 0, 0, 0.2);
     }
     .mapa-legenda {
-        font-size: 18px;
+        font-size: 16px;
         font-weight: 600;
         margin-top: 12px;
         color: #667eea;
         text-align: center;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
     }
     
     /* ===== UPLOAD SECTION ===== */
@@ -176,32 +175,35 @@ st.markdown("### 🗂️ Mapas Disponíveis")
 
 mapas = sorted(mapas_dir.glob("*.png"))
 if mapas:
-    st.markdown('<div class="mapa-grid">', unsafe_allow_html=True)
-    for mapa in mapas:
-        try:
-            with open(mapa, "rb") as f:
-                data = f.read()
-            img_b64 = base64.b64encode(data).decode("utf-8")
-            mapa_nome = mapa.stem
-            mapa_nome_url = urllib.parse.quote_plus(mapa_nome)
-            
-            # Cria botão para navegar para detalhes
-            col_card = st.columns(1)[0]
-            with col_card:
-                st.markdown(
-                    f'''
-                    <div class="mapa-card">
-                      <a class="mapa-link" href="/Detalhes?mapa={mapa_nome_url}">
-                        <img src="data:image/png;base64,{img_b64}" alt="{mapa_nome}" />
-                      </a>
-                      <div class="mapa-legenda">{mapa_nome}</div>
-                    </div>
-                    ''',
-                    unsafe_allow_html=True
-                )
-        except Exception as e:
-            st.error(f"⚠️ Erro ao carregar {mapa.name}: {e}")
-    st.markdown('</div>', unsafe_allow_html=True)
+    # Cria grid com 4 colunas
+    num_cols = 4
+    rows = [mapas[i:i + num_cols] for i in range(0, len(mapas), num_cols)]
+    
+    for row in rows:
+        cols = st.columns(num_cols)
+        for idx, mapa in enumerate(row):
+            try:
+                with open(mapa, "rb") as f:
+                    data = f.read()
+                img_b64 = base64.b64encode(data).decode("utf-8")
+                mapa_nome = mapa.stem
+                mapa_nome_url = urllib.parse.quote_plus(mapa_nome)
+                
+                with cols[idx]:
+                    st.markdown(
+                        f'''
+                        <div class="mapa-card">
+                          <a class="mapa-link" href="/Detalhes?mapa={mapa_nome_url}">
+                            <img src="data:image/png;base64,{img_b64}" alt="{mapa_nome}" />
+                          </a>
+                          <div class="mapa-legenda">{mapa_nome}</div>
+                        </div>
+                        ''',
+                        unsafe_allow_html=True
+                    )
+            except Exception as e:
+                with cols[idx]:
+                    st.error(f"⚠️ Erro ao carregar {mapa.name}: {e}")
 else:
     st.info("📭 Nenhum mapa adicionado ainda. Use o botão acima para adicionar um.")
 

@@ -14,9 +14,9 @@ import shutil
 from datetime import datetime
 
 # ================= SESSION STATE =================
-for key in ['run_sim', 'view_results', 'last_results', 'last_experiment', 'individuals_textarea']:
+for key in ['run_sim', 'view_results', 'last_results', 'last_experiment', 'individuals_textarea', 'save_only']:
     if key not in st.session_state:
-        st.session_state[key] = False if 'run' in key or 'view' in key else None
+        st.session_state[key] = False if 'run' in key or 'view' in key or 'save' in key else None
 st.session_state.individuals_textarea = st.session_state.individuals_textarea or "[]"
 
 # Session state for label-based individuals editor
@@ -296,9 +296,14 @@ st.markdown("""
 def start_simulation():
     st.session_state.run_sim = True
 
-# ================= BOTÃO DE EXECUÇÃO NO TOPO =================
-col_top1, col_top2, col_top3 = st.columns([3, 2, 3])
-with col_top2:
+def save_simulation_without_execution():
+    st.session_state.save_only = True
+
+# ================= BOTÕES DE AÇÃO NO TOPO =================
+col_top1, col_top2, col_top3 = st.columns([2, 3, 2])
+with col_top1:
+    st.button("💾 SALVAR SEM EXECUTAR", on_click=save_simulation_without_execution, type="secondary", use_container_width=True, key="save_button_top")
+with col_top3:
     st.button("▶️ EXECUTAR SIMULAÇÃO", on_click=start_simulation, type="primary", use_container_width=True, key="exec_button_top")
 st.markdown("---")
 
@@ -358,6 +363,22 @@ if existing_sim:
     # Map stored algorithm values may match one of algorithms_list; otherwise keep default
     prefill_algorithm = existing_sim.get('algoritmo', prefill_algorithm)
     prefill_mapa = existing_sim.get('mapa', prefill_mapa)
+    
+    # Exibe aviso se a simulação não foi executada
+    if existing_sim.get('executada') == 0:
+        st.info(f"""
+        📋 **Simulação Salva Carregada**: `{prefill_simulation_name}`
+        
+        Esta simulação foi **salva mas não executada**. Você pode:
+        - ✅ Executá-la agora clicando em **"▶️ EXECUTAR SIMULAÇÃO"**
+        - ✏️ Modificar os parâmetros antes de executar
+        - 💾 Salvá-la novamente com alterações
+        
+        💡 **Nota**: Ao executar, a simulação será atualizada no banco de dados (mesmo ID, status mudará para "Executada").
+        """)
+    else:
+        st.success(f"✅ **Simulação Carregada**: `{prefill_simulation_name}` (Já executada)")
+    
     # populate session_state with saved individuals/config so UI fields show them
     try:
         cfg_ped = existing_sim.get('config_pedestres_json')
@@ -541,7 +562,7 @@ with col1:
                     )
                     # use_three_objectives SEMPRE True - não mostra checkbox, apenas informa
                     use_three_obj = True
-                    
+
                 elif algorithm == "Força Bruta":
                     max_doors = st.number_input(
                         "Máximo de portas", 
@@ -968,6 +989,102 @@ with col2:
             st.warning("Mapa não encontrado.")
     else:
         st.info("Selecione um mapa para visualizar.")
+
+# ================= SALVAMENTO SEM EXECUÇÃO =================
+if st.session_state.save_only:
+    if not mapa_nome:
+        st.error("❌ Selecione um mapa primeiro.")
+    elif not st.session_state.get("individuals_textarea"):
+        st.error("❌ Defina ou carregue indivíduos antes de salvar.")
+    else:
+        with st.spinner("💾 Salvando simulação..."):
+            try:
+                temp_dir = Path("temp_simulation")
+                temp_dir.mkdir(exist_ok=True)
+
+                individuals_path = temp_dir / "individuals.json"
+                with open(individuals_path,"w") as f:
+                    json.dump(json.loads(st.session_state.individuals_textarea),f,indent=2)
+
+                gen = map_creation_service.convert_image_to_maps(str(mapa_path), str(temp_dir / "selected_map"))
+                main_map_path = Path(gen.get("main",""))
+                if not main_map_path.exists():
+                    raise RuntimeError("Falha ao gerar .map")
+
+                simulator_input_dir = Path("simulador_heuristica") / "input" / simulation_name
+                simulator_input_dir.mkdir(parents=True, exist_ok=True)
+
+                shutil.copy2(main_map_path, simulator_input_dir / "map.txt")
+                shutil.copy2(individuals_path, simulator_input_dir / "individuals.json")
+
+                # ===== Persistência no banco de dados (SEM EXECUTAR) =====
+                db = st.session_state.db_integration
+                map_id = db.save_map(mapa_nome or simulation_name, str(simulator_input_dir / "map.txt"))
+
+                # Monta payloads JSON
+                cli_config = {
+                    "experiment_name": simulation_name,
+                    "draw": True,
+                    "scenario_seed": 0,
+                    "simulation_seed": 0,
+                    "timestamp": datetime.now().isoformat(),
+                    "saved_without_execution": True
+                }
+                
+                with open(simulator_input_dir / "individuals.json", "r") as f:
+                    individuals_json_str = f.read()
+                
+                params_path = Path("temp_simulation") / "parameters.json"
+                config_simulacao_json_str = params_path.read_text() if params_path.exists() else "{}"
+
+                # Gera um id_simulacao baseado em timestamp
+                id_simulacao = int(datetime.now().timestamp())
+
+                saved = db.save_simulation(
+                    id_simulacao=id_simulacao,
+                    id_mapa=map_id if isinstance(map_id, int) else -1,
+                    nome=simulation_name,
+                    algoritmo=algorithm,
+                    config_pedestres_json=individuals_json_str,
+                    pos_pedestres_json="[]",
+                    config_simulacao_json=config_simulacao_json_str,
+                    cli_config_json=json.dumps(cli_config, ensure_ascii=False),
+                    nsga_config_json=None,
+                    executada=0  # NÃO EXECUTADA
+                )
+                
+                if not saved:
+                    try:
+                        new_id = db.create_simulation_return_id(
+                            id_mapa=map_id if isinstance(map_id, int) else -1,
+                            nome=simulation_name,
+                            algoritmo=algorithm,
+                            config_pedestres_json=individuals_json_str,
+                            pos_pedestres_json="[]",
+                            config_simulacao_json=config_simulacao_json_str,
+                            cli_config_json=json.dumps(cli_config, ensure_ascii=False),
+                            nsga_config_json=None,
+                            executada=0  # NÃO EXECUTADA
+                        )
+                        if new_id:
+                            id_simulacao = new_id
+                            saved = True
+                    except Exception:
+                        saved = False
+
+                if saved:
+                    st.success(f"✅ Simulação '{simulation_name}' salva com sucesso!")
+                    st.info("💡 A simulação aparecerá nas páginas de Detalhes e Resultados marcada como 'Não Executada'. Você pode executá-la posteriormente.")
+                else:
+                    st.error("❌ Não foi possível salvar a simulação no banco de dados.")
+                    
+            except Exception as e:
+                st.error(f"❌ Erro ao salvar simulação: {e}")
+                import traceback
+                st.code(traceback.format_exc())
+            finally:
+                st.session_state.save_only = False
+                st.rerun()
 
 # ================= EXECUÇÃO =================
 if st.session_state.run_sim:

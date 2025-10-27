@@ -4,6 +4,9 @@ Script de configuração da integração entre interface e simulador.
 
 Este script configura o ambiente necessário para a integração,
 criando diretórios, inicializando o banco de dados e verificando dependências.
+
+Uso:
+    python setup_integration.py
 """
 import os
 import sys
@@ -17,11 +20,14 @@ def create_directories():
         "uploads/algoritmo_genetico",
         "uploads/nsga_ii", 
         "uploads/forca_bruta",
+        "uploads/results",
         "simulador_heuristica/input",
         "simulador_heuristica/output",
         "temp_simulation",
         "temp_nsga",
-        "mapas"
+        "mapas",
+        "logs",
+        "presets"
     ]
     
     for directory in directories:
@@ -44,21 +50,22 @@ def initialize_database():
 def check_dependencies():
     """Verifica se as dependências estão instaladas."""
     required_packages = [
-        "streamlit",
-        "numpy",
-        "pandas",
-        "PIL"
+        ("streamlit", "streamlit"),
+        ("numpy", "numpy"),
+        ("pandas", "pandas"),
+        ("PIL", "Pillow"),
+        ("pymoo", "pymoo")
     ]
     
     missing_packages = []
     
-    for package in required_packages:
+    for import_name, package_name in required_packages:
         try:
-            __import__(package)
-            print(f"✓ {package} instalado")
+            __import__(import_name)
+            print(f"✓ {package_name} instalado")
         except ImportError:
-            missing_packages.append(package)
-            print(f"✗ {package} não encontrado")
+            missing_packages.append(package_name)
+            print(f"✗ {package_name} não encontrado")
     
     if missing_packages:
         print(f"\n⚠️ Pacotes faltando: {', '.join(missing_packages)}")
@@ -71,23 +78,31 @@ def check_simulator_structure():
     """Verifica se a estrutura do simulador está correta."""
     required_files = [
         "simulador_heuristica/simulator/main.py",
+        "simulador_heuristica/simulator/scenario.py",
         "simulador_heuristica/simulator/simulator.py",
         "simulador_heuristica/unified/mh_ga_nsgaii.py",
+        "simulador_heuristica/unified/mh_ga_factory.py",
+        "simulador_heuristica/unified/mh_ga_instance.py",
+        "simulador_heuristica/unified/sim_ca_scenario.py",
+        "simulador_heuristica/unified/sim_ca_simulator.py",
         "modulo_criacao_mapas/map_converter_utils.py",
-        "modulo_criacao_mapas/map_converter.py"
+        "modulo_criacao_mapas/map_converter.py",
+        "interface/App.py",
+        "interface/services/nsga_integration.py",
+        "interface/services/simulator_integration.py"
     ]
     
     missing_files = []
     
     for file_path in required_files:
         if Path(file_path).exists():
-            print(f"✓ {file_path} encontrado")
+            print(f"✓ {file_path}")
         else:
             missing_files.append(file_path)
             print(f"✗ {file_path} não encontrado")
     
     if missing_files:
-        print(f"\n⚠️ Arquivos do simulador faltando: {missing_files}")
+        print(f"\n⚠️ Arquivos faltando: {len(missing_files)}")
         return False
     
     return True
@@ -95,27 +110,84 @@ def check_simulator_structure():
 def create_example_configs():
     """Cria arquivos de configuração de exemplo."""
     
-    # Configuração de exemplo para NSGA-II
-    nsga_config = {
-        "population_size": 20,
-        "generations": 10,
-        "crossover_rate": 0.8,
-        "mutation_rate": 0.1,
-        "description": "Configuração de exemplo para NSGA-II"
+    # Verifica se preset directory existe
+    preset_dir = Path("presets")
+    if not preset_dir.exists():
+        preset_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Configuração de teste rápido
+    test_config = {
+        "nsga_config": {
+            "population_size": 20,
+            "generations": 10,
+            "mutation_rate": 0.2
+        },
+        "simulation_params": {
+            "scenario_seed": [0],
+            "simulation_seed": 0,
+            "max_iterations": 500,
+            "draw_mode": False,
+            "verbose": False
+        },
+        "description": "Configuração rápida para testes"
     }
     
-    config_file = Path("uploads/nsga_ii/example_config.json")
-    config_file.parent.mkdir(parents=True, exist_ok=True)
+    # Configuração de produção média
+    production_config = {
+        "nsga_config": {
+            "population_size": 50,
+            "generations": 30,
+            "mutation_rate": 0.15
+        },
+        "simulation_params": {
+            "scenario_seed": [0],
+            "simulation_seed": 0,
+            "max_iterations": 1000,
+            "draw_mode": True,
+            "verbose": False
+        },
+        "description": "Configuração balanceada para uso geral"
+    }
+    
+    # Configuração de pesquisa pesada
+    research_config = {
+        "nsga_config": {
+            "population_size": 100,
+            "generations": 50,
+            "mutation_rate": 0.1
+        },
+        "simulation_params": {
+            "scenario_seed": [0],
+            "simulation_seed": 0,
+            "max_iterations": 1500,
+            "draw_mode": True,
+            "verbose": True
+        },
+        "description": "Configuração completa para pesquisa"
+    }
+    
+    configs = [
+        ("Teste_Rapido.json", test_config),
+        ("Producao_Media.json", production_config),
+        ("Pesquisa_Pesada.json", research_config)
+    ]
     
     import json
-    with open(config_file, 'w') as f:
-        json.dump(nsga_config, f, indent=2)
-    
-    print(f"✓ Arquivo de configuração de exemplo criado: {config_file}")
+    for filename, config in configs:
+        config_file = preset_dir / filename
+        if not config_file.exists():
+            with open(config_file, 'w') as f:
+                json.dump(config, f, indent=2)
+            print(f"✓ Preset criado: {filename}")
+        else:
+            print(f"○ Preset já existe: {filename}")
 
 def main():
     """Função principal de configuração."""
-    print("🚀 Configurando integração entre interface e simulador...\n")
+    print("=" * 70)
+    print("  CONFIGURAÇÃO DO SISTEMA DE SIMULAÇÃO E OTIMIZAÇÃO DE EVACUAÇÃO")
+    print("=" * 70)
+    print()
     
     # Cria diretórios
     print("📁 Criando diretórios...")
@@ -128,39 +200,51 @@ def main():
     print()
     
     # Verifica dependências
-    print("📦 Verificando dependências...")
+    print("📦 Verificando dependências Python...")
     deps_ok = check_dependencies()
     print()
     
     # Verifica estrutura do simulador
-    print("🔍 Verificando estrutura do simulador...")
+    print("🔍 Verificando estrutura do projeto...")
     simulator_ok = check_simulator_structure()
     print()
     
     # Cria configurações de exemplo
-    print("📝 Criando configurações de exemplo...")
+    print("📝 Criando presets de configuração...")
     create_example_configs()
     print()
     
     # Resumo
-    print("=" * 50)
-    print("📋 RESUMO DA CONFIGURAÇÃO")
-    print("=" * 50)
+    print("=" * 70)
+    print("  RESUMO DA CONFIGURAÇÃO")
+    print("=" * 70)
+    print()
     
     if deps_ok and simulator_ok:
-        print("✅ Integração configurada com sucesso!")
-        print("\nPara executar a interface:")
-        print("  streamlit run interface/App.py")
-        print("\nPara executar o simulador diretamente:")
-        print("  python -m simulador_heuristica.simulator.main -e cult_experiment")
+        print("✅ Sistema configurado com sucesso!")
+        print()
+        print("🚀 Para iniciar a interface web:")
+        print("   streamlit run interface/App.py")
+        print()
+        print("🔧 Para executar o simulador diretamente (CLI):")
+        print("   python -m simulador_heuristica.simulator.main -e <experiment>")
+        print()
+        print("📚 Documentação disponível em:")
+        print("   - README.md (visão geral)")
+        print("   - docs/USER_GUIDE.md (guia do usuário)")
+        print("   - docs/ARCHITECTURE.md (arquitetura)")
+        print("   - docs/API_REFERENCE.md (referência)")
     else:
         print("⚠️ Configuração incompleta. Verifique os erros acima.")
+        print()
         if not deps_ok:
-            print("  - Instale as dependências faltantes")
+            print("  ❌ Instale as dependências faltantes:")
+            print("     pip install -r requirements.txt")
         if not simulator_ok:
-            print("  - Verifique se todos os arquivos do simulador estão presentes")
+            print("  ❌ Verifique se todos os arquivos do projeto estão presentes")
     
-    print("\n📚 Documentação disponível em: docs/integration/")
+    print()
+    print("=" * 70)
 
 if __name__ == "__main__":
     main()

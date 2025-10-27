@@ -68,38 +68,101 @@ st.markdown("""
         background-color: #0072e0;
     }
 
-    /* ===== TABELA ===== */
-    .tabela-container {
-        display: flex;
-        justify-content: center;
-        margin-bottom: 20px;
-    }
-    table.tabela {
-        border-collapse: collapse;
-        width: 85%;
-        font-size: 17px;
-        text-align: center;
+    /* ===== TABELA MODERNIZADA ===== */
+    .modern-table {
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 0;
+        margin: 1.5rem 0;
         border-radius: 12px;
         overflow: hidden;
-        box-shadow: 0 0 12px rgba(255,255,255,0.05);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
     }
-    table.tabela thead {
-        background-color: #1e2b3b;
-        color: #fff;
+    
+    .modern-table thead {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     }
-    table.tabela th, table.tabela td {
-        padding: 12px 18px;
-        border-bottom: 1px solid #2a2f38;
+    
+    .modern-table th {
+        padding: 16px 20px;
+        color: white;
+        font-weight: 600;
+        text-align: left;
+        font-size: 14px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
     }
-    table.tabela tr:hover td {
-        background-color: rgba(255,255,255,0.05);
+    
+    .modern-table tbody tr {
+        background-color: #1a1a2e;
+        transition: all 0.2s ease;
     }
-    a.sim-link {
-        color: #1e90ff;
+    
+    .modern-table tbody tr:hover {
+        background-color: #252541;
+        transform: scale(1.01);
+    }
+    
+    .modern-table td {
+        padding: 16px 20px;
+        color: #e0e0e0;
+        border-bottom: 1px solid rgba(255,255,255,0.05);
+        font-size: 15px;
+    }
+    
+    .modern-table tbody tr:last-child td {
+        border-bottom: none;
+    }
+
+    /* ===== BADGES E INDICADORES ===== */
+    .badge {
+        display: inline-block;
+        padding: 6px 12px;
+        border-radius: 20px;
+        font-size: 13px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    .badge-success {
+        background: rgba(72, 187, 120, 0.2);
+        color: #68d391;
+        border: 1px solid #68d391;
+    }
+    
+    .badge-warning {
+        background: rgba(237, 137, 54, 0.2);
+        color: #ed8936;
+        border: 1px solid #ed8936;
+    }
+
+    /* ===== BOTÃO DE AÇÃO NA TABELA ===== */
+    .table-action-btn {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 8px 16px;
+        border-radius: 8px;
         text-decoration: none;
+        font-size: 14px;
+        font-weight: 600;
+        transition: all 0.2s ease;
+        display: inline-block;
+    }
+    
+    .table-action-btn:hover {
+        transform: scale(1.05);
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    }
+    
+    a.sim-link {
+        color: #667eea;
+        text-decoration: none;
+        font-weight: 600;
     }
     a.sim-link:hover {
         text-decoration: underline;
+        color: #764ba2;
     }
 
     /* ===== SEPARADORES E TÍTULOS ===== */
@@ -139,13 +202,22 @@ st.markdown("""
 # ================= MENU SUPERIOR =================
 st.markdown("""
 <div class="menu">
-    <a href="../app">Menu</a>
-    <a href="./Mapas">Mapas</a>
-    <a href="./Criacao_Mapas">Criação de Mapas</a>
-    <a href="./Parâmetros">Parâmetros</a>
-    <a href="./Resultados" class="active">Resultados</a>
-    <a href="./Documentação">Documentação</a>
+    <a href="/">Menu</a>
+    <a href="/Mapas">Mapas</a>
+    <a href="/Criação_de_Mapas">Criação de Mapas</a>
+    <a href="/Parâmetros">Parâmetros</a>
+    <a href="/Simulação">Simulação</a>
+    <a href="/Resultados" class="active">Resultados</a>
+    <a href="/Documentação">Documentação</a>
 </div>
+""", unsafe_allow_html=True)
+
+# ================= CABEÇALHO DA PÁGINA =================
+st.markdown("""
+    <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 2rem; border-radius: 15px; margin-bottom: 2rem; box-shadow: 0 4px 15px rgba(0,0,0,0.3); text-align: center;">
+        <h1 style="color: white; margin: 0; font-size: 2.5rem; font-weight: 700;">📊 Resultados de Simulações</h1>
+        <p style="color: rgba(255,255,255,0.9); margin: 0.5rem 0 0 0; font-size: 1.1rem;">Visualize e analise os resultados das suas simulações</p>
+    </div>
 """, unsafe_allow_html=True)
 
 # ================= INICIALIZAÇÃO DO BANCO =================
@@ -154,50 +226,45 @@ if 'db_integration' not in st.session_state:
 if 'simulator_integration' not in st.session_state:
     st.session_state.simulator_integration = SimulatorIntegration()
 
-# ================= BOTÃO ATUALIZAR =================
-col1, col2, col3 = st.columns([1, 1, 1])
-with col2:
-    if st.button("🔄 Atualizar Lista"):
-        st.rerun()
-
 # ================= TABELA DE SIMULAÇÕES =================
 simulations = st.session_state.db_integration.get_simulations()
 
 if simulations:
     rows_html = "".join([
-        f"<tr>"
-        f"<td>{sim['id']}</td>"
-        f"<td><a class='sim-link' href='?sim={sim['nome']}'>{sim['nome']}</a></td>"
-        f"<td>{sim['mapa']}</td>"
-        f"<td>{sim['algoritmo']}</td>"
-        f"<td>{sim['simulado']}</td>"
-        f"</tr>"
+        f"""<tr>
+            <td><strong>#{sim['id']}</strong></td>
+            <td><a class='sim-link' href='?sim={sim['nome']}'>{sim['nome']}</a></td>
+            <td>{sim['mapa']}</td>
+            <td><span class="badge badge-success">{sim['algoritmo']}</span></td>
+            <td>{"<span class='badge badge-success'>✓ Sim</span>" if sim.get('simulado') == 'SIM' else "<span class='badge badge-warning'>✗ Não</span>"}</td>
+            <td><a href='/Simulação?sim_id={sim['id']}' class='table-action-btn'>👁️ Visualizar</a></td>
+        </tr>"""
         for sim in simulations
     ])
 
     table_html = f"""
-    <div class="tabela-container">
-        <table class="tabela">
-            <thead>
-                <tr>
-                    <th>ID</th>
-                    <th>NOME</th>
-                    <th>MAPA</th>
-                    <th>ALGORITMO</th>
-                    <th>SIMULADO</th>
-                </tr>
-            </thead>
-            <tbody>
-                {rows_html}
-            </tbody>
-        </table>
-    </div>
+    <table class="modern-table">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Nome da Simulação</th>
+                <th>Mapa</th>
+                <th>Algoritmo</th>
+                <th>Status</th>
+                <th>Ações</th>
+            </tr>
+        </thead>
+        <tbody>
+            {rows_html}
+        </tbody>
+    </table>
     """
     st.markdown(table_html, unsafe_allow_html=True)
+    
     # Filtro de seleção (fallback caso link não funcione)
     nomes = [s['nome'] for s in simulations]
     default_idx = nomes.index(st.query_params.get("sim")) if isinstance(st.query_params.get("sim"), str) and st.query_params.get("sim") in nomes else 0
-    sel = st.selectbox("Selecione para ver detalhes", options=nomes, index=default_idx if nomes else 0, key="sel_resultados")
+    sel = st.selectbox("📋 Selecione uma simulação para ver detalhes", options=nomes, index=default_idx if nomes else 0, key="sel_resultados")
     if sel and sel != st.query_params.get("sim"):
         try:
             st.query_params["sim"] = sel
@@ -205,7 +272,7 @@ if simulations:
         except Exception:
             pass
 else:
-    st.info("Nenhuma simulação encontrada.")
+    st.info("📭 Nenhuma simulação encontrada no banco de dados.")
 
 # ================= DETALHES DA SIMULAÇÃO =================
 params = st.query_params
@@ -370,8 +437,55 @@ if selected_name:
         frames = res.get('frames', [])
         if frames:
             st.markdown("<hr>", unsafe_allow_html=True)
-            st.markdown("<div class='section-title'>Frames</div>", unsafe_allow_html=True)
-            idx = st.slider("Frame", min_value=1, max_value=len(frames), value=len(frames))
+            st.markdown("<div class='section-title'>🎬 Visualização da Simulação</div>", unsafe_allow_html=True)
+            
+            # Botão para criar GIF
+            col_gif1, col_gif2 = st.columns([1, 3])
+            with col_gif1:
+                if st.button("📹 Criar GIF Animado", key="create_gif_btn", help="Gera um GIF animado com todos os frames"):
+                    with st.spinner("🎬 Criando GIF animado..."):
+                        try:
+                            from PIL import Image
+                            import io
+                            
+                            # Carrega todos os frames
+                            gif_frames = []
+                            for frame_path in frames:
+                                img = Image.open(str(frame_path))
+                                gif_frames.append(img)
+                            
+                            # Cria GIF em memória
+                            gif_buffer = io.BytesIO()
+                            gif_frames[0].save(
+                                gif_buffer,
+                                format='GIF',
+                                save_all=True,
+                                append_images=gif_frames[1:],
+                                duration=100,  # 100ms por frame = 10 FPS
+                                loop=0,  # Loop infinito
+                                optimize=True
+                            )
+                            gif_buffer.seek(0)
+                            
+                            # Botão de download
+                            st.download_button(
+                                label="⬇️ Download GIF",
+                                data=gif_buffer,
+                                file_name=f"{selected_name}_simulacao.gif",
+                                mime="image/gif",
+                                key="download_gif_btn"
+                            )
+                            st.success(f"✅ GIF criado com {len(gif_frames)} frames!")
+                            
+                        except Exception as e:
+                            st.error(f"❌ Erro ao criar GIF: {e}")
+            
+            with col_gif2:
+                st.info(f"💡 **{len(frames)} frames disponíveis** - Use o slider abaixo para navegar ou crie um GIF animado")
+            
+            # Slider de navegação de frames
+            st.markdown("<div style='margin-top: 1rem;'></div>", unsafe_allow_html=True)
+            idx = st.slider("Frame", min_value=1, max_value=len(frames), value=len(frames), key="frame_slider")
             st.image(str(frames[idx-1]), use_container_width=True)
 
         # ===== RELATÓRIO =====

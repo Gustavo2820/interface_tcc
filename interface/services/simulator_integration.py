@@ -188,6 +188,38 @@ class DatabaseIntegration:
             # ensure foreign key constraints are enabled
             con.execute('PRAGMA foreign_keys = ON')
             cur = con.cursor()
+            
+            # NOVA LÓGICA: Verifica se existe simulação com mesmo nome não executada
+            cur.execute("""
+                SELECT id_simulacao, executada FROM Simulacao 
+                WHERE nome = ? 
+                ORDER BY id_simulacao DESC 
+                LIMIT 1
+            """, (nome,))
+            existing = cur.fetchone()
+            
+            if existing:
+                existing_id, existing_executada = existing
+                # Se já existe uma não executada e estamos executando agora, ATUALIZA
+                if existing_executada == 0 and executada == 1:
+                    print(f"🔄 Atualizando simulação existente '{nome}' (ID: {existing_id}) para executada=1")
+                    cur.execute("""
+                        UPDATE Simulacao 
+                        SET executada = ?,
+                            config_pedestres_json = ?,
+                            pos_pedestres_json = ?,
+                            config_simulacao_json = ?,
+                            cli_config_json = ?,
+                            nsga_config_json = ?
+                        WHERE id_simulacao = ?
+                    """, (int(executada), config_pedestres_json, pos_pedestres_json,
+                          config_simulacao_json, cli_config_json, nsga_config_json,
+                          existing_id))
+                    con.commit()
+                    con.close()
+                    return True
+            
+            # Caso contrário, insere normalmente (novo registro)
             # If an id_simulacao is provided, try to insert using it.
             if id_simulacao and int(id_simulacao) > 0:
                 try:

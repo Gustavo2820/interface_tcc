@@ -1,104 +1,60 @@
 ﻿# Arquitetura do Sistema
 
-## Visão Geral da Arquitetura
+Documentação da arquitetura do Sistema de Simulação e Otimização de Evacuação de Multidões.
 
-O sistema de simulação de evacuação de multidões é organizado em camadas bem definidas, separando interfaces de execução dos módulos core de simulação e otimização.
+## 📋 Índice
 
-## Diagrama de Arquitetura
+- [Visão Geral](#visão-geral)
+- [Componentes Principais](#componentes-principais)
+- [Fluxo de Execução](#fluxo-de-execução)
+- [Armazenamento de Dados](#armazenamento-de-dados)
+- [Padrões de Design](#padrões-de-design)
 
-`
+## 🌟 Visão Geral
 
-                        INTERFACES                               
-─
-  main3.py          main4.py          z_experiment*.py          
-  (NSGA-II+cache)   (Força Bruta)    (NSGA-II via pymoo)       
-──
-                                   
+### Arquitetura em Camadas
 
-                    META-HEURÍSTICAS (mh/)                      
-─
-  mh_ga_instance.py    mh_ga_factory.py    mh_ga_nsgaii.py      
-  (Configuração)       (Factory)           (NSGA-II)            
-─
-                                   
-─
-                    HEURÍSTICAS (h/)                             
+```
+┌─────────────────────────────────────────────────────────┐
+│                 INTERFACE WEB (Streamlit)               │
+│  - Páginas (Mapas, Parâmetros, Simulação, Resultados)  │
+│  - Componentes visuais e interação com usuário         │
+└────────────────────┬────────────────────────────────────┘
+                     │
+┌────────────────────▼────────────────────────────────────┐
+│            CAMADA DE INTEGRAÇÃO (Services)              │
+│  - nsga_integration.py (NSGA-II pymoo)                  │
+│  - nsga_cached_integration.py (NSGA-II customizado)     │
+│  - bruteforce_integration.py (Força bruta)              │
+│  - simulator_integration.py (Execução de simulador)     │
+│  - map_creation_integration.py (Criação de mapas)       │
+└────────────────────┬────────────────────────────────────┘
+                     │
+┌────────────────────▼────────────────────────────────────┐
+│         CORE DO SIMULADOR E OTIMIZAÇÃO                  │
+│  simulador_heuristica/                                  │
+│  ├── simulator/ (Simulador principal CLI)               │
+│  ├── unified/ (NSGA-II cached + Cellular Automata)      │
+│  └── heuristics/ (Algoritmos de otimização)             │
+│                                                          │
+│  modulo_criacao_mapas/                                  │
+│  └── Conversão e validação de mapas                     │
+└────────────────────┬────────────────────────────────────┘
+                     │
+┌────────────────────▼────────────────────────────────────┐
+│              PERSISTÊNCIA DE DADOS                      │
+│  - database/ (SQLite: histórico, mapas, resultados)     │
+│  - uploads/ (Arquivos JSON de configuração/resultados)  │
+│  - logs/ (Logs de execução)                             │
+└─────────────────────────────────────────────────────────┘
+```
 
-  h_brute_force.py                                               
-  (Força Bruta)                                                  
+### Princípios Arquiteturais
 
-                  
-
-                SIMULAÇÃO (sim_ca/)                              
-─
-  scenario.py    simulator.py    individual.py                  
-  (Cenários)     (Simulador)     (Indivíduos)                   
-─
-  crowd_map.py   static_map.py   dinamic_map.py                 
-  (Multidão)     (Campos Est.)   (Campos Din.)                  
-
-  wall_map.py    structure_map.py logs.py constants.py          
-  (Paredes)      (Estrutura)     (Logs)    (Constantes)         
-─
-`
-
-## Fluxo de Execução Principal
-
-### 1. NSGA-II com Cache (main3)
-
-`
-main3.py
-    
-mh_ga_instance.py (read_instance)
-    
-mh_ga_factory.py (Factory)
-    
-mh_ga_nsgaii.py (nsgaii)
-    
-sim_ca_scenario.py (Scenario)
-    
-sim_ca_simulator.py (Simulator)
-    
-sim_ca_*.py (Módulos de simulação)
-    
-res.json (Resultados)
-`
-
-### 2. Força Bruta (main4)
-
-`
-main4.py
-    
-mh_ga_instance.py (read_instance)
-    
-h_brute_force.py (BruteForce)
-    
-sim_ca_scenario.py (Scenario)
-    
-sim_ca_simulator.py (Simulator)
-    
-sim_ca_*.py (Módulos de simulação)
-    
-res.json (Resultados)
-`
-
-### 3. NSGA-II via pymoo (z*)
-
-`
-z_experiment*.py
-    
-ScenarioOptimizationProblem (pymoo)
-    
-sim_ca_scenario.py (Scenario)
-    
-sim_ca_simulator.py (Simulator)
-    
-sim_ca_*.py (Módulos de simulação)
-    
-resultados_*.txt (Resultados)
-`
-
-## Tabela de Entradas, Processos e Saídas
+1. **Separação de Responsabilidades**
+   - UI não conhece detalhes de implementação do simulador
+   - Services fazem a ponte entre camadas
+   - Core é independente da interface
 
 | Componente | Entradas | Processos | Saídas |
 |------------|----------|-----------|--------|
@@ -141,57 +97,334 @@ resultados_*.txt (Resultados)
  sim_ca_simulator     sim_ca_individual
     
                                 
-                                
-    
- sim_ca_crowd_map     sim_ca_static_map
-    
-                                
-                                
-    
- sim_ca_dinamic_map   sim_ca_wall_map 
-    
-                                
-                                
-    
- sim_ca_structure_map  sim_ca_logs     
-    
-                                
-                                
-    
- sim_ca_constants         res.json    
-    
-`
 
-## Padrões de Design Utilizados
+2. **Configuração Unificada**
+   - Formato JSON único para todos os algoritmos
+   - Presets reutilizáveis
+   - Parâmetros de simulação e otimização separados
 
-### 1. Factory Pattern
-- **mh_ga_factory.py**: Cria genes e cromossomos
-- **sim_ca_scenario.py**: Cria cenários de simulação
+3. **Modularidade**
+   - Componentes podem ser testados isoladamente
+   - Fácil adição de novos algoritmos
+   - Extensível para novas features
 
-### 2. Strategy Pattern
-- **main3.py**: Estratégia NSGA-II com cache
-- **main4.py**: Estratégia força bruta
-- **z_experiment*.py**: Estratégia NSGA-II via pymoo
+## 🔧 Componentes Principais
 
-### 3. Observer Pattern
-- **sim_ca_logs.py**: Observa e registra eventos da simulação
+### Interface Web (Streamlit)
 
-### 4. Template Method Pattern
-- **mh_ga_nsgaii.py**: Define estrutura do algoritmo NSGA-II
+**App.py** - Ponto de entrada
+- Configuração global (layout, CSS, theme)
+- Gerenciamento de sessão (`st.session_state`)
+- Menu de navegação e sidebar
 
-## Fluxo de Dados
+**Pages** - Páginas da aplicação
+- `Mapas.py`: Criação, edição e gestão de mapas
+- `Parâmetros.py`: Configuração de algoritmos e presets
+- `Simulação.py`: Execução de simulações e otimizações
+- `Resultados.py`: Visualização e análise de resultados
+- `Detalhes.py`: Informações detalhadas de simulações
 
-### Entrada de Dados
-1. **experiment.json**: Configuração do experimento
-2. **map.txt**: Mapa estrutural do ambiente
-3. **individuals.json**: Configuração dos indivíduos
-4. **positions.txt**: Posições iniciais
+### Camada de Integração (Services)
 
-### Processamento
-1. **Leitura de configuração**: mh_ga_instance.py
-2. **Criação de genes**: mh_ga_factory.py
-3. **Otimização**: mh_ga_nsgaii.py ou h_brute_force.py
-4. **Simulação**: sim_ca_simulator.py
+**NSGAIntegration** (`nsga_integration.py`)
+- Integra NSGA-II pymoo com interface
+- Gerencia Problem adapter para pymoo
+- Extrai portas possíveis do mapa
+- Coordena avaliações de fitness
+
+**CachedNSGAIntegration** (`nsga_cached_integration.py`)
+- Integra NSGA-II cached (customizado)
+- Usa implementação em `simulador_heuristica/unified/`
+- Cache de avaliações para evitar re-simulações
+- Retorna 3 objetivos: [portas, iterações, distância]
+
+**BruteForceIntegration** (`bruteforce_integration.py`)
+- Integra algoritmo de força bruta
+- Explora todas as combinações de portas
+- Limitado a problemas pequenos
+
+**SimulatorIntegration** (`simulator_integration.py`)
+- Executa simulador via CLI subprocess
+- Prepara arquivos de entrada
+- Lê resultados de output/
+- Gerencia banco de dados SQLite
+- Funções: `prepare_experiment`, `run_simulator_cli`, `read_results`, `save_simulation`
+
+**MapCreationIntegration** (`map_creation_integration.py`)
+- Conversão PNG ↔ map.txt
+- Validação de mapas (dimensões, cores, portas)
+- Geração de previews
+- Codificação: 0=vazio, 1=parede, 2=porta, 3=obstáculo
+
+### Core do Simulador
+
+**simulator/** - Simulador principal (CLI)
+- `main.py`: Interface de linha de comando
+  - Argumentos: -e (experiment), -d (draw), -m (scenario_seed), -s (simulation_seed)
+- `scenario.py`: Configuração de cenários
+- `simulator.py`: Motor de simulação básico
+
+**unified/** - Implementação unificada CA + NSGA-II
+- `mh_ga_nsgaii.py`: NSGA-II customizado com cache
+- `mh_ga_factory.py`: Factory de avaliação de genes
+- `mh_ga_instance.py`: Classe de instância (configuração)
+- `sim_ca_scenario.py`: Cenários Cellular Automata
+- `sim_ca_simulator.py`: Simulador CA
+- `sim_ca_*.py`: Componentes CA (maps, individuals, etc.)
+
+**heuristics/** - Algoritmos de otimização
+- `brute_force.py`: Força bruta para teste exaustivo
+
+### Módulo de Criação de Mapas
+
+**modulo_criacao_mapas/**
+- `map_converter.py`: Conversão entre formatos
+- `map_converter_utils.py`: Utilitários de validação
+
+## 🔄 Fluxo de Execução
+
+### Otimização NSGA-II (Pymoo)
+
+```
+1. UI (Simulação.py)
+   - Configuração NSGA-II carregada
+   - Mapa template com possíveis portas
+
+2. NSGAIntegration.setup_optimization()
+   - Extrai coordenadas de portas possíveis
+   - Cria EvacuationProblem (pymoo Problem)
+   - Configura NSGA2 algorithm
+
+3. NSGAIntegration.run_optimization()
+   - minimize(problem, NSGA2(), termination)
+   
+4. Para cada indivíduo da população:
+   - EvacuationProblem._evaluate(x)
+     a. Decodifica gene binário → posições de portas
+     b. Gera mapa com portas selecionadas
+     c. Chama SimulatorIntegration.run_simulator_cli()
+     d. Extrai objetivos: [num_doors, iterations, distance]
+     e. Retorna fitness
+
+5. Algoritmo evolui população por N gerações
+   - Seleção, crossover, mutação
+   - Non-dominated sorting
+   - Crowding distance
+
+6. Retorna Fronteira de Pareto
+   - Conjunto de soluções ótimas
+
+7. NSGAIntegration.save_results()
+   - JSON com todas as soluções
+   - Formato: [{objectives, doors, config}, ...]
+
+8. Resultados salvos no banco de dados
+   - Tabela de soluções com status e métricas
+```
+
+### Otimização NSGA-II (Cached)
+
+```
+1-2. Igual ao pymoo
+
+3. NSGAIntegration.run_cached_nsga()
+   - CachedNSGAIntegration.run_optimization()
+
+4. CachedNSGAIntegration prepara Instance
+   - Instance(experiment, draw, scenario_seed, simulation_seed, max_iterations)
+
+5. Factory.decode() para cada gene
+   - Verifica cache (configuração já avaliada?)
+   - Se não: executa simulação
+   - Se sim: retorna resultado cacheado
+
+6-8. Igual ao pymoo
+```
+
+## 💾 Armazenamento de Dados
+
+### Banco de Dados SQLite
+
+**Localização:** `database/simulacoes.db`
+
+**Tabelas:**
+
+**Simulacao**
+- id_simulacao (INTEGER PRIMARY KEY)
+- nome (TEXT)
+- data_criacao (TEXT)
+- algoritmo (TEXT)
+- mapa_id (INTEGER FK)
+- resultado (TEXT JSON)
+- executada (INTEGER 0/1)
+- descricao (TEXT)
+
+**Mapa**
+- id_mapa (INTEGER PRIMARY KEY)
+- nome (TEXT)
+- caminho (TEXT)
+- data_criacao (TEXT)
+- dimensoes (TEXT)
+
+**Resultado**
+- id_resultado (INTEGER PRIMARY KEY)
+- simulacao_id (INTEGER FK)
+- metricas (TEXT JSON)
+- data_execucao (TEXT)
+
+### Arquivos JSON
+
+**Configurações** (`presets/*.json`)
+```json
+{
+  "nsga_config": {
+    "population_size": 50,
+    "generations": 30,
+    "mutation_rate": 0.15
+  },
+  "simulation_params": {
+    "scenario_seed": [0],
+    "simulation_seed": 0,
+    "max_iterations": 1000,
+    "draw_mode": true,
+    "verbose": false
+  },
+  "description": "Descrição do preset"
+}
+```
+
+**Resultados** (`uploads/nsga_ii/*.json`)
+```json
+[
+  {
+    "objectives": [3, 450, 2345.6],
+    "door_positions": [[4, 1], [4, 2], [10, 5]],
+    "metrics": {
+      "iterations": 450,
+      "distance": 2345.6,
+      "evacuated": 100
+    }
+  }
+]
+```
+
+### Diretórios de Dados
+
+```
+uploads/
+├── nsga_ii/          # Resultados de otimizações NSGA-II
+├── forca_bruta/      # Resultados de força bruta
+└── results/          # Exportações de dados
+
+simulador_heuristica/
+├── input/            # Arquivos de entrada temporários
+│   └── <experiment>/
+│       ├── map.txt
+│       └── individuals.json
+└── output/           # Resultados de simulações
+    ├── <experiment>/
+    │   ├── metrics.json
+    │   ├── eventos.csv
+    │   ├── crowd_map/     # PNGs de densidade
+    │   └── dinamic_map/   # PNGs de movimento
+    └── nsga_eval_*/       # Avaliações NSGA-II
+
+temp_nsga/            # Dados temporários de otimização
+logs/                 # Logs de execução
+mapas/                # Mapas salvos
+```
+
+## 🎨 Padrões de Design
+
+### Factory Pattern
+
+**Uso:** `mh_ga_factory.py`
+
+- Cria objetos complexos (Scenario, Genes)
+- Encapsula lógica de instanciação
+- Cache de avaliações implementado aqui
+
+```python
+class Factory:
+    def __init__(self, instance):
+        self.instance = instance
+        self.cache = {}  # Cache de avaliações
+    
+    def decode(self, gene):
+        # Cria cenário com portas do gene
+        # Verifica cache antes de simular
+        # Retorna fitness
+```
+
+### Strategy Pattern
+
+**Uso:** Algoritmos intercambiáveis
+
+- NSGA-II pymoo
+- NSGA-II cached
+- Força bruta
+
+Interface comum via services permite trocar algoritmo sem alterar UI.
+
+### Singleton Pattern
+
+**Uso:** Services exportados
+
+```python
+# Em cada service
+class SimulatorIntegration:
+    # ... implementação
+
+# No fim do arquivo
+simulator_integration = SimulatorIntegration()  # Singleton
+```
+
+Garante instância única, evita re-inicialização.
+
+### Observer Pattern (Implícito)
+
+**Uso:** Logs e eventos
+
+- `sim_ca_logs.py` observa eventos da simulação
+- Registra em arquivo CSV
+- UI pode ler logs para acompanhar progresso
+
+## 🔗 Integrações Externas
+
+### Pymoo (Algoritmos Evolutivos)
+
+- Biblioteca: `pymoo`
+- Usado em: `NSGAIntegration`
+- Fornece: NSGA2, Problem, minimize()
+- Custom Problem adapter: `EvacuationProblem`
+
+### Streamlit (Web Framework)
+
+- Framework: `streamlit`
+- Features usadas:
+  - Páginas automáticas (`pages/`)
+  - Session state
+  - Caching (`@st.cache_data`)
+  - Widgets interativos
+  - File uploads
+
+### SQLite (Banco de Dados)
+
+- Built-in do Python
+- Driver: `sqlite3`
+- Sem servidor necessário
+- Arquivo único: `simulacoes.db`
+
+### PIL/Pillow (Processamento de Imagens)
+
+- Biblioteca: `Pillow`
+- Usado em: Conversão de mapas
+- Funções: load image, convert, resize
+
+---
+
+**Versão:** 1.0  
+**Atualizado:** Outubro 2024
 5. **Cálculo de objetivos**: iterations, distance, doors
 
 ### Saída de Dados
