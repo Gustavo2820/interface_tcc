@@ -67,7 +67,8 @@ class SimulatorIntegration:
         experiment_name: str, 
         draw: bool = False, 
         scenario_seed: Optional[int] = None, 
-        simulation_seed: Optional[int] = None
+        simulation_seed: Optional[int] = None,
+        max_iterations: Optional[int] = None
     ) -> subprocess.CompletedProcess:
         cmd = [sys.executable, "-m", "simulador_heuristica.simulator.main", "-e", experiment_name]
         if draw:
@@ -76,6 +77,8 @@ class SimulatorIntegration:
             cmd += ["-m", str(scenario_seed)]
         if simulation_seed is not None:
             cmd += ["-s", str(simulation_seed)]
+        if max_iterations is not None:
+            cmd += ["--max-iterations", str(max_iterations)]
         # Execute from project root so 'simulador_heuristica' package is importable with -m
         project_root = self.base_path.parent
         return subprocess.run(cmd, cwd=project_root, capture_output=True, text=True, check=False)

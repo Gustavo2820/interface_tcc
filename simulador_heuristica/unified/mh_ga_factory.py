@@ -75,6 +75,9 @@ class Factory(ChromosomeFactory):
         scen = Scenario(self.instance.experiment, doors, self.instance.draw,
                             self.instance.scenario_seed[0], self.instance.simulation_seed)
         simulator = Simulator(scen)
+        # Apply max_iterations from instance if provided
+        if hasattr(self.instance, 'max_iterations') and self.instance.max_iterations is not None:
+            simulator.MAX_ITERATIONS = self.instance.max_iterations
         iterations, qtdDistance = simulator.simulate()
         print(f"Portas: {len(doors)}, Iter: {iterations}, Dist: {qtdDistance}")
         iters.append(iterations)
@@ -85,6 +88,9 @@ class Factory(ChromosomeFactory):
             i += 1
             scen.scenario_reset(current_seed, self.instance.simulation_seed)
             simulator = Simulator(scen)
+            # Apply max_iterations from instance if provided
+            if hasattr(self.instance, 'max_iterations') and self.instance.max_iterations is not None:
+                simulator.MAX_ITERATIONS = self.instance.max_iterations
             iterations, qtdDistance = simulator.simulate()
             print(f"Portas: {len(doors)}, Iter: {iterations}, Dist: {qtdDistance}")
             iters.append(iterations)

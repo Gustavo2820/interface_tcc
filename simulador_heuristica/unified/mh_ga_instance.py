@@ -4,11 +4,12 @@ import os
 
 class Instance:
 
-    def __init__(self, experiment, draw, scenario_seed, simulation_seed):
+    def __init__(self, experiment, draw, scenario_seed, simulation_seed, max_iterations=None):
         self.experiment = experiment
         self.draw = draw
         self.scenario_seed = scenario_seed
         self.simulation_seed = simulation_seed
+        self.max_iterations = max_iterations  # Store max_iterations for simulator
 
 
 def read_instance(experiment):

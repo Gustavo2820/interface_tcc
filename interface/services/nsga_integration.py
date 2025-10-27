@@ -29,31 +29,23 @@ if str(unified_path) not in sys.path:
 if str(simulator_path) not in sys.path:
     sys.path.append(str(simulator_path))
 
-print("DEBUG: Tentando importar módulos NSGA-II...")
-print(f"DEBUG: simulador_path: {simulador_path}")
-print(f"DEBUG: unified_path: {unified_path}")
-print(f"DEBUG: sys.path entries: {[p for p in sys.path if 'simulador' in p]}")
-
 # Import the unified integration API (single source of truth for simulator logic)
 try:
     from simulador_heuristica.simulator import integration_api
-    print("DEBUG: integration_api imported successfully")
 except ImportError as e:
-    print(f"WARNING: Could not import integration_api: {e}")
+    logger.warning(f"Could not import integration_api: {e}")
     integration_api = None
 
 # Import cached NSGA-II integration (optional)
 try:
     from .nsga_cached_integration import get_cached_nsga_integration
-    print("DEBUG: Cached NSGA-II integration available")
     CACHED_NSGA_AVAILABLE = True
 except ImportError as e:
-    print(f"DEBUG: Cached NSGA-II not available: {e}")
+    logger.debug(f"Cached NSGA-II not available: {e}")
     get_cached_nsga_integration = None
     CACHED_NSGA_AVAILABLE = False
 
 try:
-    print("DEBUG: Importando pymoo...")
     from pymoo.algorithms.moo.nsga2 import NSGA2
     from pymoo.core.problem import Problem
     from pymoo.core.callback import Callback
@@ -61,16 +53,10 @@ try:
     from pymoo.operators.sampling.rnd import BinaryRandomSampling
     from pymoo.operators.crossover.hux import HalfUniformCrossover
     from pymoo.operators.mutation.bitflip import BitflipMutation
-    print("DEBUG: Módulos pymoo importados com sucesso")
-    print("DEBUG: NSGA2 =", NSGA2)
-    print("DEBUG: Problem =", Problem)
-    print("DEBUG: minimize =", minimize)
-    st.success("Módulos pymoo importados com sucesso")
+    st.success("✓ Algoritmo NSGA-II carregado com sucesso")
 except ImportError as e:
-    print(f"DEBUG: Erro ao importar módulos do pymoo: {e}")
-    import traceback
-    print(f"DEBUG: Traceback completo: {traceback.format_exc()}")
-    st.error(f"Erro ao importar módulos do pymoo: {e}")
+    logger.error(f"Erro ao importar módulos do pymoo: {e}")
+    st.error(f"⚠ Erro ao carregar NSGA-II: {e}")
     # Fallback para quando os módulos não estão disponíveis
     NSGA2 = None
     Problem = None
@@ -79,10 +65,8 @@ except ImportError as e:
     HalfUniformCrossover = None
     BitflipMutation = None
 except Exception as e:
-    print(f"DEBUG: Erro inesperado ao importar módulos: {e}")
-    import traceback
-    print(f"DEBUG: Traceback completo: {traceback.format_exc()}")
-    st.error(f"Erro inesperado ao importar módulos: {e}")
+    logger.exception(f"Erro inesperado ao importar módulos: {e}")
+    st.error(f"⚠ Erro inesperado ao carregar NSGA-II: {e}")
     # Fallback para quando os módulos não estão disponíveis
     NSGA2 = None
     Problem = None
@@ -115,17 +99,19 @@ class StreamlitProgressCallback(Callback):
     do Streamlit com informações sobre a geração atual.
     """
     
-    def __init__(self, max_generations: int):
+    def __init__(self, max_generations: int, progress_bar, status_text):
         """
         Inicializa o callback.
         
         Args:
             max_generations: Número total de gerações
+            progress_bar: Componente st.progress já criado
+            status_text: Componente st.empty já criado
         """
         super().__init__()
         self.max_generations = max_generations
-        self.progress_bar = st.progress(0.0)
-        self.status_text = st.empty()
+        self.progress_bar = progress_bar
+        self.status_text = status_text
     
     def notify(self, algorithm):
         """
@@ -134,18 +120,22 @@ class StreamlitProgressCallback(Callback):
         Args:
             algorithm: Instância do algoritmo NSGA-II
         """
-        current_gen = algorithm.n_gen
-        progress = current_gen / self.max_generations
-        
-        # Atualiza barra de progresso
-        self.progress_bar.progress(min(progress, 1.0))
-        
-        # Atualiza texto de status
-        pop_size = len(algorithm.pop) if hasattr(algorithm, 'pop') and algorithm.pop is not None else 0
-        self.status_text.text(
-            f"Geração {current_gen}/{self.max_generations} "
-            f"({progress*100:.1f}%) - População: {pop_size}"
-        )
+        try:
+            current_gen = algorithm.n_gen
+            progress = current_gen / self.max_generations
+            
+            # Atualiza barra de progresso
+            self.progress_bar.progress(min(progress, 1.0))
+            
+            # Atualiza texto de status
+            pop_size = len(algorithm.pop) if hasattr(algorithm, 'pop') and algorithm.pop is not None else 0
+            self.status_text.text(
+                f"Geração {current_gen}/{self.max_generations} "
+                f"({progress*100:.1f}%) - População: {pop_size}"
+            )
+        except Exception as e:
+            # Silenciosamente ignora erros de UI para não interromper a otimização
+            logger.debug(f"Erro ao atualizar progresso: {e}")
 
 
 class EvacuationProblem(Problem):
@@ -277,13 +267,15 @@ class EvacuationProblem(Problem):
             scenario_seed = self.simulation_params.get('scenario_seed')
             simulation_seed = self.simulation_params.get('simulation_seed')
             draw_mode = self.simulation_params.get('draw_mode', False)
+            max_iterations = self.simulation_params.get('max_iterations')
 
             # Execute simulator CLI and capture output for debugging
             proc = self.simulator_integration.run_simulator_cli(
                 experiment_name,
                 draw=draw_mode,
                 scenario_seed=scenario_seed,
-                simulation_seed=simulation_seed
+                simulation_seed=simulation_seed,
+                max_iterations=max_iterations
             )
 
             # Log subprocess result when available
@@ -355,7 +347,7 @@ class EvacuationProblem(Problem):
                 if temp_dir.exists():
                     shutil.rmtree(temp_dir, ignore_errors=True)
             except Exception as e:
-                print(f"DEBUG: Failed to remove temp_dir {temp_dir}: {e}")
+                logger.debug(f"Failed to remove temp_dir {temp_dir}: {e}")
 
     
     def _decode_gene(self, gene: Any) -> List[tuple]:
@@ -654,14 +646,14 @@ class NSGAIntegration:
             # Detecta se é formato unificado ou legado
             if 'nsga_config' in config:
                 # Formato unificado
-                print("DEBUG: Detectado formato unificado")
                 nsga_config = config['nsga_config']
                 simulation_params = config.get('simulation_params', {})
                 
                 # Valida configuração NSGA-II necessária
                 required_keys = ['population_size', 'generations', 'crossover_rate', 'mutation_rate']
                 if not all(key in nsga_config for key in required_keys):
-                    print("Configuração unificada inválida: chaves NSGA-II obrigatórias ausentes")
+                    logger.error("Unified config missing required NSGA-II keys")
+                    st.error("⚠ Configuração incompleta")
                     return False
                 
                 # Armazena configurações separadamente
@@ -671,22 +663,22 @@ class NSGAIntegration:
                 
             else:
                 # Formato legado (compatibilidade)
-                print("DEBUG: Detectado formato legado")
                 required_keys = ['population_size', 'generations', 'crossover_rate', 'mutation_rate']
                 if not all(key in config for key in required_keys):
-                    print("Configuração legada inválida: chaves obrigatórias ausentes")
+                    logger.error("Legacy config missing required keys")
+                    st.error("⚠ Configuração incompleta")
                     return False
                 
                 self.config = config
                 self.simulation_params = {}
                 self.is_unified_format = False
             
-            print(f"DEBUG: Configuração carregada - NSGA: {self.config}")
-            print(f"DEBUG: Parâmetros de simulação: {self.simulation_params}")
+            logger.info(f"✓ Configuração carregada: pop={self.config['population_size']}, gen={self.config['generations']}")
             return True
             
         except Exception as e:
-            print(f"Erro ao carregar configuração: {e}")
+            logger.exception(f"Error loading configuration: {e}")
+            st.error(f"⚠ Erro ao carregar configuração: {e}")
             return False
     
     def get_simulation_params(self) -> Dict:
@@ -818,7 +810,7 @@ class NSGAIntegration:
         if integration_api is not None:
             try:
                 doors_info = integration_api.extract_doors_from_map_text(map_template)
-                print(f"DEBUG: integration_api.extract_doors_from_map_text returned {len(doors_info)} grouped doors")
+                logger.debug(f"Extracted {len(doors_info)} grouped doors from map")
                 return doors_info
             except Exception as e:
                 logger.error(f"Failed to call integration_api.extract_doors_from_map_text: {e}")
@@ -833,7 +825,7 @@ class NSGAIntegration:
                 if char == '2':
                     door_positions.append((x, y))
         
-        print(f"DEBUG: Fallback found {len(door_positions)} door cells (legacy per-cell format)")
+        logger.debug(f"Fallback found {len(door_positions)} door cells (legacy per-cell format)")
         return door_positions
     
     def setup_optimization(
@@ -856,29 +848,17 @@ class NSGAIntegration:
             True se configurou com sucesso, False caso contrário
         """
         try:
-            print("DEBUG: Iniciando setup_optimization...")
-            st.info("Iniciando setup_optimization...")
-            
             # Check if pymoo modules are available
-            print("DEBUG: Verificando módulos pymoo...")
             if NSGA2 is None or Problem is None or minimize is None:
-                print("DEBUG: Módulos pymoo não disponíveis")
-                st.error("Módulos pymoo não disponíveis")
+                st.error("⚠ Módulos de otimização não disponíveis")
+                logger.error("Pymoo modules not available")
                 return False
             
-            print(f"DEBUG: hasattr config: {hasattr(self, 'config')}")
             if not hasattr(self, 'config'):
-                print("DEBUG: Configuração NSGA-II não carregada")
-                st.error("Configuração NSGA-II não carregada")
+                st.error("⚠ Configuração não carregada")
+                logger.error("NSGA-II configuration not loaded")
                 return False
             
-            st.info(f"Configuração NSGA-II: {self.config}")
-            st.info(f"Map template length: {len(map_template)}")
-            st.info(f"Individuals template keys: {list(individuals_template.keys()) if isinstance(individuals_template, dict) else 'Not a dict'}")
-            st.info(f"Door positions: {len(door_positions)}")
-            
-            print("DEBUG: Criando EvacuationProblem...")
-            st.info("Criando EvacuationProblem...")
             # Cria o problema de evacuação
             self.problem = EvacuationProblem(
                 self.simulator_integration, 
@@ -887,10 +867,7 @@ class NSGAIntegration:
                 door_positions,
                 self.get_simulation_params()
             )
-            print("DEBUG: Problem criado com sucesso")
-            st.success("Problem criado com sucesso")
             
-            st.info("Configurando algoritmo NSGA-II...")
             # Cria o algoritmo NSGA-II
             self.algorithm = NSGA2(
                 pop_size=self.config['population_size'],
@@ -899,16 +876,13 @@ class NSGAIntegration:
                 mutation=BitflipMutation(prob=self.config['mutation_rate']),
                 eliminate_duplicates=True
             )
-            st.success("Algoritmo NSGA-II configurado com sucesso")
             
-            st.success("setup_optimization concluído com sucesso!")
+            logger.info(f"NSGA-II configurado: pop={self.config['population_size']}, gen={self.config['generations']}")
             return True
             
         except Exception as e:
-            import traceback
-            st.error(f"Erro ao configurar otimização: {e}")
-            st.text("Traceback completo:")
-            st.code(traceback.format_exc())
+            st.error(f"⚠ Erro ao configurar otimização: {e}")
+            logger.exception(f"Error in setup_optimization: {e}")
             return False
     
     def run_optimization(self, experiment_name: Optional[str] = None) -> Optional[Dict]:
@@ -935,17 +909,21 @@ class NSGAIntegration:
         logger.info("Using STANDARD (pymoo) NSGA-II workflow")
         
         if not hasattr(self, 'problem') or not hasattr(self, 'algorithm'):
-            print("NSGA-II não configurado")
+            st.error("⚠ NSGA-II não configurado corretamente")
+            logger.error("NSGA-II not properly configured")
             return None
         
         try:
-            print(f"DEBUG: Iniciando otimização pymoo...")
-            print(f"  - population_size: {self.config['population_size']}")
-            print(f"  - generations: {self.config['generations']}")
-            print(f"  - mutation_rate: {self.config['mutation_rate']}")
+            # Cria componentes de progresso
+            progress_bar = st.progress(0.0)
+            status_text = st.empty()
             
             # Cria callback para atualizar progresso no Streamlit
-            progress_callback = StreamlitProgressCallback(self.config['generations'])
+            progress_callback = StreamlitProgressCallback(
+                self.config['generations'],
+                progress_bar,
+                status_text
+            )
             
             # Executa a otimização usando pymoo
             res = minimize(
@@ -954,23 +932,19 @@ class NSGAIntegration:
                 termination=('n_gen', self.config['generations']),
                 seed=1,
                 callback=progress_callback,
-                verbose=True
+                verbose=False
             )
             
             # Limpa a barra de progresso ao finalizar
-            progress_callback.progress_bar.empty()
-            progress_callback.status_text.empty()
+            progress_bar.empty()
+            status_text.empty()
             
-            print(f"DEBUG: Otimização concluída")
-            print(f"  - Soluções encontradas: {len(res.X)}")
-            print(f"  - Objetivos: {len(res.F)}")
-            
+            logger.info(f"Otimização concluída: {len(res.X)} soluções encontradas")
             return res
             
         except Exception as e:
-            import traceback
-            print(f"Erro na execução da otimização: {e}")
-            print(f"Traceback completo: {traceback.format_exc()}")
+            logger.exception(f"Erro na execução da otimização: {e}")
+            st.error(f"⚠ Erro durante a otimização: {e}")
             return None
     
     def save_results(self, result: Dict, output_file: Path) -> bool:
@@ -1082,6 +1056,11 @@ class NSGAIntegration:
                 num_doors = obj_list[0]
                 iterations = obj_list[1]
                 distance = obj_list[2]
+                
+                # POST-PARETO FILTER: Remove solutions with 0 doors (they don't make sense)
+                if num_doors is not None and int(num_doors) == 0:
+                    logger.debug(f"Filtering out 0-door solution {i} from Pareto front")
+                    continue
 
                 # Build expanded per-cell door coordinates from grouped/tuple representations.
                 # OFFICIAL INTEGRATION: Use integration_api.expand_grouped_doors
@@ -1278,12 +1257,13 @@ class NSGAIntegration:
                         logger.debug(f"failed to backfill iterations into results file: {e}")
 
             except Exception as e:
-                print(f"DEBUG: failed to aggregate per-eval metrics: {e}")
+                logger.debug(f"failed to aggregate per-eval metrics: {e}")
 
             return True
 
         except Exception as e:
-            print(f"Erro ao salvar resultados: {e}")
+            logger.exception(f"Error saving results: {e}")
+            st.error(f"⚠ Erro ao salvar resultados: {e}")
             import traceback
             print(traceback.format_exc())
             return False

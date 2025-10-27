@@ -41,8 +41,12 @@ class TkinterMapEditorIntegration:
             'Espaço vazio': ((255, 255, 255), '#FFFFFF', '0'),
             'Tapete/Caminho': ((255, 165, 0), '#FFA500', '9'),
             'Porta/Saída': ((255, 0, 0), '#FF0000', '2'),
-            'Janelas': ((0, 255, 0), '#00FF00', '7'),
             'Inocupável': ((192, 192, 192), '#C0C0C0', '8'),
+        }
+        
+        # Cores alternativas aceitas (mapeiam para as cores principais)
+        self.alternative_colors = {
+            (128, 128, 128): 'Inocupável',  # Cinza escuro alternativo
         }
     
     def get_color_scheme(self) -> Dict[str, tuple]:

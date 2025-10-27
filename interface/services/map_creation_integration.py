@@ -40,8 +40,12 @@ class MapCreationIntegration:
             'Espaço vazio': ((255, 255, 255), '#FFFFFF', '0'),
             'Tapete/Caminho': ((255, 165, 0), '#FFA500', '9'),
             'Porta/Saída': ((255, 0, 0), '#FF0000', '2'),
-            'Janelas': ((0, 255, 0), '#00FF00', '7'),
             'Inocupável': ((192, 192, 192), '#C0C0C0', '8'),
+        }
+        
+        # Cores alternativas aceitas (mapeiam para as cores principais)
+        self.alternative_colors = {
+            (128, 128, 128): 'Inocupável',  # Cinza escuro alternativo
         }
     
     def get_color_scheme(self) -> Dict[str, Tuple[Tuple[int, int, int], str, str]]:
@@ -80,8 +84,9 @@ class MapCreationIntegration:
                         rgb = tuple(pixel[:3])
                         unique_colors.add(rgb)
             
-            # Verificar se todas as cores são compatíveis
+            # Verificar se todas as cores são compatíveis (incluindo alternativas)
             compatible_colors = {color[0] for color in self.colors.values()}
+            compatible_colors.update(self.alternative_colors.keys())
             incompatible = unique_colors - compatible_colors
             
             if incompatible:

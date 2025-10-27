@@ -52,7 +52,9 @@ try:
     import inspect
     init_sig = inspect.signature(callback_class.__init__)
     assert 'max_generations' in init_sig.parameters
-    print("   ✓ __init__ aceita parâmetro max_generations")
+    assert 'progress_bar' in init_sig.parameters
+    assert 'status_text' in init_sig.parameters
+    print("   ✓ __init__ aceita parâmetros: max_generations, progress_bar, status_text")
     
     # Check notify method
     assert hasattr(callback_class, 'notify')

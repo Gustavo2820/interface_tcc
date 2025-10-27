@@ -156,11 +156,14 @@ class CachedNSGAIntegration:
         if simulation_seed is None:
             simulation_seed = self.simulation_params.get('simulation_seed', 0)
         
+        max_iterations = self.simulation_params.get('max_iterations')
+        
         return Instance(
             experiment=experiment_name,
             draw=draw,
             scenario_seed=scenario_seed,
-            simulation_seed=simulation_seed
+            simulation_seed=simulation_seed,
+            max_iterations=max_iterations
         )
     
     def run_optimization(
@@ -180,26 +183,13 @@ class CachedNSGAIntegration:
         """
         if cached_nsgaii is None or Factory is None or selector is None:
             logger.error("Cached NSGA-II not available - imports failed")
-            logger.error(f"  cached_nsgaii: {cached_nsgaii}")
-            logger.error(f"  Factory: {Factory}")
-            logger.error(f"  selector: {selector}")
-            print(f"[CACHED-NSGA] ERROR: Imports not available!")
-            print(f"[CACHED-NSGA]   cached_nsgaii: {cached_nsgaii is not None}")
-            print(f"[CACHED-NSGA]   Factory: {Factory is not None}")
-            print(f"[CACHED-NSGA]   selector: {selector is not None}")
+            st.error("⚠ Módulos de otimização não disponíveis")
             return None
         
         if not self.config:
             logger.error("Configuration not loaded")
-            print("[CACHED-NSGA] ERROR: Config not loaded!")
+            st.error("⚠ Configuração não carregada")
             return None
-        
-        logger.info(f"DEBUG: Starting run_optimization with experiment: {experiment_name}")
-        logger.info(f"DEBUG: Config: {self.config}")
-        logger.info(f"DEBUG: Simulation params: {self.simulation_params}")
-        print(f"[CACHED-NSGA] Starting optimization: {experiment_name}")
-        print(f"[CACHED-NSGA] Config: {self.config}")
-        print(f"[CACHED-NSGA] Sim params: {self.simulation_params}")
         
         try:
             # CRITICAL: Stage input files BEFORE creating Instance/Factory
@@ -214,11 +204,6 @@ class CachedNSGAIntegration:
             project_root = Path(__file__).resolve().parents[2]
             source_dir = project_root / "simulador_heuristica" / "input" / experiment_name
             
-            logger.info(f"Staging files from {source_dir} to {input_dir}")
-            print(f"[CACHED-NSGA] Staging files:")
-            print(f"  FROM: {source_dir}")
-            print(f"  TO: {input_dir}")
-            
             if not (source_dir / "map.txt").exists():
                 raise FileNotFoundError(f"map.txt not found in {source_dir}")
             if not (source_dir / "individuals.json").exists():
@@ -226,8 +211,7 @@ class CachedNSGAIntegration:
             
             shutil.copy2(source_dir / "map.txt", input_dir / "map.txt")
             shutil.copy2(source_dir / "individuals.json", input_dir / "individuals.json")
-            logger.info("✓ Files staged successfully")
-            print("[CACHED-NSGA] ✓ Files staged successfully")
+            logger.debug(f"Files staged from {source_dir} to {input_dir}")
             
             # Now prepare instance
             scenario_seed = self.simulation_params.get('scenario_seed', [0])
@@ -235,50 +219,43 @@ class CachedNSGAIntegration:
                 scenario_seed = [scenario_seed]
             
             simulation_seed = self.simulation_params.get('simulation_seed', 0)
-            
-            print(f"[CACHED-NSGA] Creating instance with:")
-            print(f"  experiment: {experiment_name}")
-            print(f"  draw: {draw}")
-            print(f"  scenario_seed: {scenario_seed}")
-            print(f"  simulation_seed: {simulation_seed}")
+            max_iterations = self.simulation_params.get('max_iterations')
             
             instance = Instance(
                 experiment=experiment_name,
                 draw=draw,
                 scenario_seed=scenario_seed,
-                simulation_seed=simulation_seed
+                simulation_seed=simulation_seed,
+                max_iterations=max_iterations
             )
             
-            print(f"[CACHED-NSGA] Instance created: {instance}")
-            
             # Create factory with caching
-            logger.info("Creating Factory with simulation caching...")
-            print("[CACHED-NSGA] Creating Factory...")
             factory = Factory(instance)
-            print(f"[CACHED-NSGA] Factory created: {factory}")
             
             # Run cached NSGA-II
             population_size = self.config['population_size']
             mutation_prob = self.config['mutation_rate']
             max_generations = self.config['generations']
             
-            logger.info(f"Starting cached NSGA-II: pop={population_size}, "
-                       f"mut={mutation_prob}, gen={max_generations}")
-            print(f"[CACHED-NSGA] Running NSGA-II: pop={population_size}, mut={mutation_prob}, gen={max_generations}")
+            logger.info(f"Starting cached NSGA-II: pop={population_size}, gen={max_generations}")
             
-            # Cria função de callback para atualizar progresso no Streamlit
+            # Cria componentes de progresso no Streamlit
             import streamlit as st
             progress_bar = st.progress(0.0)
             status_text = st.empty()
             
             def progress_callback(current_gen, total_gen):
                 """Atualiza barra de progresso no Streamlit."""
-                progress = current_gen / total_gen
-                progress_bar.progress(min(progress, 1.0))
-                status_text.text(
-                    f"Geração {current_gen}/{total_gen} "
-                    f"({progress*100:.1f}%)"
-                )
+                try:
+                    progress = current_gen / total_gen
+                    progress_bar.progress(min(progress, 1.0))
+                    status_text.text(
+                        f"Geração {current_gen}/{total_gen} "
+                        f"({progress*100:.1f}%)"
+                    )
+                except Exception as e:
+                    # Silenciosamente ignora erros de UI para não interromper a otimização
+                    logger.debug(f"Erro ao atualizar progresso: {e}")
             
             results = cached_nsgaii(
                 factory=factory,
@@ -290,25 +267,18 @@ class CachedNSGAIntegration:
             )
             
             # Limpa a barra de progresso ao finalizar
-            progress_bar.empty()
-            status_text.empty()
+            try:
+                progress_bar.empty()
+                status_text.empty()
+            except:
+                pass  # Ignora erros ao limpar
             
-            logger.info(f"DEBUG: cached_nsgaii returned: {type(results)}")
-            logger.info(f"DEBUG: results length: {len(results) if results else 'None'}")
-            print(f"[CACHED-NSGA] NSGA-II returned: type={type(results)}, len={len(results) if results else 'None'}")
-            logger.info(f"Cached NSGA-II completed: {len(results)} solutions in Pareto front")
-            logger.info(f"Cache statistics: {len(factory.cache)} simulations cached")
-            print(f"[CACHED-NSGA] Completed: {len(results)} solutions, {len(factory.cache)} cached sims")
-            
-            logger.info(f"DEBUG: Returning tuple (results, factory)")
-            print(f"[CACHED-NSGA] Returning tuple (results, factory)")
+            logger.info(f"Cached NSGA-II completed: {len(results)} solutions, {len(factory.cache)} cached simulations")
             return results, factory
             
         except Exception as e:
-            import traceback
             logger.exception(f"Error running cached NSGA-II: {e}")
-            print(f"[CACHED-NSGA] EXCEPTION: {e}")
-            print(f"[CACHED-NSGA] Traceback:\n{traceback.format_exc()}")
+            st.error(f"⚠ Erro durante a otimização: {e}")
             return None
     
     def convert_results_to_standard_format(
@@ -342,25 +312,30 @@ class CachedNSGAIntegration:
             List of solution dictionaries
         """
         from simulador_heuristica.simulator import integration_api
-        
+
         converted = []
-        
+
         for i, chromosome in enumerate(results):
             # Extract data from chromosome
             gene_config = chromosome.gene.configuration
             num_doors, iterations, distance = chromosome.obj
             generation = chromosome.generation
             
+            # POST-PARETO FILTER: Remove solutions with 0 doors (they don't make sense)
+            if num_doors is not None and int(num_doors) == 0:
+                logger.debug(f"Filtering out 0-door cached solution {i} from Pareto front")
+                continue
+
             # Decode gene to get door configurations
             doors_grouped = factory.uncode(chromosome.gene)
-            
+
             # Expand grouped doors to per-cell coordinates
             try:
                 doors_expanded = integration_api.expand_grouped_doors(doors_grouped)
             except Exception as e:
                 logger.warning(f"Failed to expand doors for solution {i}: {e}")
                 doors_expanded = []
-            
+
             # Build objectives array based on mode
             if self.use_three_objectives:
                 # 3-objective mode: all three are optimization objectives
@@ -368,10 +343,13 @@ class CachedNSGAIntegration:
             else:
                 # 2-objective mode: iterations is auxiliary
                 objectives_array = [int(num_doors), float(distance)]
-            
+
+            # Preserve original solution id (use index from results)
+            solution_id = i
+
             # Build result object (compatible with standard NSGA format)
             result_obj = {
-                "solution_id": i,
+                "solution_id": solution_id,
                 "gene": list(gene_config),
                 "door_positions": doors_expanded,  # Primary key: expanded coords
                 "door_positions_grouped": doors_grouped,  # Secondary key: grouped format
@@ -382,7 +360,7 @@ class CachedNSGAIntegration:
                 "generation": int(generation),
                 "algorithm": f"NSGA-II-Cached-{len(objectives_array)}obj"
             }
-            
+
             converted.append(result_obj)
         
         mode_str = "3-objective" if self.use_three_objectives else "2-objective"

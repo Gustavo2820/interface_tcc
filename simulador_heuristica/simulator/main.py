@@ -30,6 +30,7 @@ parser.add_argument('-e', action="store", dest='experiment', type=str, required=
 parser.add_argument('-d', action="store_const", dest='draw', const=True, default=False, help="Enable Draw Mode.")
 parser.add_argument('-m', action="store", dest='scenario_seed', type=int, required=False, help="Seed to generate the scenario.")
 parser.add_argument('-s', action="store", dest='simulation_seed', type=int, required=False, help="Seed to guide the simulation.")
+parser.add_argument('--max-iterations', action="store", dest='max_iterations', type=int, required=False, default=1200, help="Maximum iterations for simulation (default: 1200).")
 
 if __name__ == "__main__":
     args = parser.parse_args()
@@ -89,7 +90,7 @@ if __name__ == "__main__":
 
     # SIMULATOR
     directory = root_path + "output" + sep + args.experiment
-    scen = Scenario(args.experiment, args.draw, args.scenario_seed or 0, args.simulation_seed or 0)
+    scen = Scenario(args.experiment, args.draw, args.scenario_seed or 0, args.simulation_seed or 0, max_iterations=args.max_iterations)
     simulator = Simulator(scen)
     iterations, qtdDistance = simulator.simulate()
 

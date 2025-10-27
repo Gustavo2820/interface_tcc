@@ -10,7 +10,7 @@ import streamlit as st
 # ================= CONFIGURAÇÃO DA PÁGINA =================
 st.set_page_config(page_title="Documentação", layout="wide")
 
-# ================= CSS GLOBAL =================
+# ================= CSS E CABEÇALHO DECORATIVO =================
 st.markdown("""
     <style>
     /* ===== MENU SUPERIOR ===== */
@@ -19,12 +19,12 @@ st.markdown("""
         justify-content: center;
         gap: 40px;
         margin-bottom: 40px;
-        font-size: 20px;
-        font-weight: 600;
+        font-size: 18px;
+        font-weight: 500;
     }
     .menu a {
         text-decoration: none;
-        color: #bbb;
+        color: #aaa;
         transition: color 0.2s;
     }
     .menu a:hover {
@@ -32,46 +32,84 @@ st.markdown("""
     }
     .menu a.active {
         color: #fff;
-        font-weight: 700;
-        border-bottom: 2px solid #1e90ff;
+        font-weight: 600;
+        border-bottom: 2px solid #667eea;
         padding-bottom: 4px;
     }
 
-    body { 
-        font-family: 'Inter', 'Roboto', sans-serif; 
-        background-color: white; 
-        color: #222; 
+    /* ===== CABEÇALHO DA PÁGINA ===== */
+    .page-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        padding: 2rem;
+        border-radius: 15px;
+        margin-bottom: 2rem;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.3);
     }
-    .titulo { 
-        text-align: center; 
-        font-size: 36px; 
-        font-weight: 700; 
-        margin-bottom: 10px; 
+    .page-header h1 {
+        color: white;
+        margin: 0;
+        font-size: 2.5rem;
+        font-weight: 700;
     }
-    .linha { 
-        width: 200px; 
-        height: 2px; 
-        background-color: #444; 
-        margin: 0 auto 50px auto; 
+    .page-header p {
+        color: rgba(255,255,255,0.9);
+        margin: 0.5rem 0 0 0;
+        font-size: 1.1rem;
+    }
+    
+    /* ===== TABS ===== */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 8px;
+    }
+    .stTabs [data-baseweb="tab"] {
+        background-color: rgba(26, 26, 46, 0.3);
+        border-radius: 8px;
+        padding: 10px 20px;
+        color: #aaa;
+    }
+    .stTabs [aria-selected="true"] {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+    }
+    
+    /* ===== EXPANDERS ===== */
+    .streamlit-expanderHeader {
+        background-color: rgba(26, 26, 46, 0.4) !important;
+        border-radius: 8px;
+        font-weight: 600;
+        color: #667eea !important;
+    }
+    
+    /* ===== CODE BLOCKS ===== */
+    code {
+        background-color: rgba(26, 26, 46, 0.5);
+        padding: 2px 6px;
+        border-radius: 4px;
+        color: #667eea;
     }
     </style>
 """, unsafe_allow_html=True)
 
-# ================= MENU SUPERIOR =================
+# ===== MENU SUPERIOR =====
 st.markdown("""
-<div class="menu">
-    <a href="../app" >Menu</a>
-    <a href="./Mapas">Mapas</a>
-    <a href="./Criacao_Mapas">Criação de Mapas</a>
-    <a href="./Parâmetros">Parâmetros</a>
-    <a href="./Resultados">Resultados</a>
-    <a href="./Documentação" class="active">Documentação</a>
-</div>
+    <div class="menu">
+        <a href="/">Menu</a>
+        <a href="/Mapas">Mapas</a>
+        <a href="/Criação_de_Mapas">Criação de Mapas</a>
+        <a href="/Parâmetros">Parâmetros</a>
+        <a href="/Simulação">Simulação</a>
+        <a href="/Resultados">Resultados</a>
+        <a class="active" href="/Documentação">Documentação</a>
+    </div>
 """, unsafe_allow_html=True)
 
-# ================= TÍTULO =================
-st.markdown('<div class="titulo">DOCUMENTAÇÃO</div>', unsafe_allow_html=True)
-st.markdown('<div class="linha"></div>', unsafe_allow_html=True)
+# ===== CABEÇALHO DA PÁGINA =====
+st.markdown("""
+    <div class="page-header">
+        <h1>📚 Documentação</h1>
+        <p>Guias, referências e exemplos para usar o sistema de simulação de evacuação</p>
+    </div>
+""", unsafe_allow_html=True)
 
 # ================= CONTEÚDO =================
 st.write("""

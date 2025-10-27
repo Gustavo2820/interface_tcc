@@ -14,13 +14,14 @@ import json
 class Scenario(object):
 
 
-    def __init__(self, experiment, draw=False, scenario_seed=0, simulation_seed=0, directory=''):
+    def __init__(self, experiment, draw=False, scenario_seed=0, simulation_seed=0, directory='', max_iterations=None):
         self.directory = experiment
         self.draw = draw
         self.scenario_seed = scenario_seed
         self.num_scenario = 0
         self.simulation_seed = simulation_seed
         self.num_simulation = 0
+        self.max_iterations = max_iterations  # Store max_iterations for simulator
 
         self.sep = os.path.sep
         # Base paths on this file location

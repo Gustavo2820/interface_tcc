@@ -32,7 +32,7 @@ except ImportError as e:
 # ================= CONFIGURAÇÃO DA PÁGINA =================
 st.set_page_config(page_title="Criação de Mapas", layout="wide")
 
-# ================= CSS GLOBAL =================
+# ================= CSS E CABEÇALHO DECORATIVO =================
 st.markdown("""
     <style>
     /* ===== MENU SUPERIOR ===== */
@@ -41,12 +41,12 @@ st.markdown("""
         justify-content: center;
         gap: 40px;
         margin-bottom: 40px;
-        font-size: 20px;
-        font-weight: 600;
+        font-size: 18px;
+        font-weight: 500;
     }
     .menu a {
         text-decoration: none;
-        color: #bbb;
+        color: #aaa;
         transition: color 0.2s;
     }
     .menu a:hover {
@@ -54,45 +54,79 @@ st.markdown("""
     }
     .menu a.active {
         color: #fff;
-        font-weight: 700;
-        border-bottom: 2px solid #1e90ff;
+        font-weight: 600;
+        border-bottom: 2px solid #667eea;
         padding-bottom: 4px;
     }
-
-    body { 
-        font-family: 'Inter', 'Roboto', sans-serif; 
-        background-color: white; 
-        color: #222; 
+    
+    /* ===== CABEÇALHO DA PÁGINA ===== */
+    .page-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        padding: 2rem;
+        border-radius: 15px;
+        margin-bottom: 2rem;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.3);
     }
-    .titulo { 
-        text-align: center; 
-        font-size: 36px; 
-        font-weight: 700; 
-        margin-bottom: 10px; 
+    .page-header h1 {
+        color: white;
+        margin: 0;
+        font-size: 2.5rem;
+        font-weight: 700;
     }
-    .linha { 
-        width: 200px; 
-        height: 2px; 
-        background-color: #444; 
-        margin: 0 auto 50px auto; 
+    .page-header p {
+        color: rgba(255,255,255,0.9);
+        margin: 0.5rem 0 0 0;
+        font-size: 1.1rem;
     }
     
-    /* ===== EDITOR DE MAPAS ===== */
-    .map-editor {
-        border: 2px solid #ddd;
+    /* ===== BOTÕES ===== */
+    .stButton button {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        font-weight: 600;
         border-radius: 8px;
-        padding: 20px;
-        margin: 20px 0;
-        background-color: #f9f9f9;
+        padding: 10px 24px;
+        font-size: 16px;
+        border: none;
+        transition: 0.2s ease-in-out;
+        box-shadow: 0 3px 10px rgba(0,0,0,0.3);
+    }
+    .stButton button:hover {
+        transform: scale(1.05);
+        box-shadow: 0 5px 15px rgba(102, 126, 234, 0.5);
+    }
+    
+    /* ===== TABS ===== */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 8px;
+    }
+    .stTabs [data-baseweb="tab"] {
+        background-color: rgba(26, 26, 46, 0.3);
+        border-radius: 8px;
+        padding: 10px 20px;
+        color: #aaa;
+    }
+    .stTabs [aria-selected="true"] {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+    }
+    
+    /* ===== CARDS E SEÇÕES ===== */
+    .map-editor {
+        background: rgba(26, 26, 46, 0.2);
+        border: 1px solid rgba(102, 126, 234, 0.3);
+        border-radius: 12px;
+        padding: 1.5rem;
+        margin: 1rem 0;
     }
     
     .color-legend {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 15px;
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 12px;
         margin: 15px 0;
         padding: 15px;
-        background-color: #f0f0f0;
+        background: rgba(26, 26, 46, 0.3);
         border-radius: 8px;
     }
     
@@ -100,60 +134,47 @@ st.markdown("""
         display: flex;
         align-items: center;
         gap: 8px;
+        padding: 8px;
+        background: rgba(0,0,0,0.2);
+        border-radius: 6px;
     }
     
     .color-box {
-        width: 20px;
-        height: 20px;
-        border: 1px solid #333;
-        border-radius: 3px;
+        width: 24px;
+        height: 24px;
+        border: 2px solid #667eea;
+        border-radius: 4px;
     }
     
-    .pixel-grid {
-        display: grid;
-        gap: 1px;
-        background-color: #333;
-        padding: 10px;
+    /* ===== EXPANDERS ===== */
+    .streamlit-expanderHeader {
+        background-color: rgba(26, 26, 46, 0.4) !important;
         border-radius: 8px;
-        margin: 20px 0;
-    }
-    
-    .pixel-cell {
-        width: 20px;
-        height: 20px;
-        border: none;
-        cursor: pointer;
-        transition: opacity 0.1s;
-    }
-    
-    .pixel-cell:hover {
-        opacity: 0.8;
-    }
-    
-    .download-section {
-        background-color: #e8f4fd;
-        padding: 20px;
-        border-radius: 8px;
-        margin: 20px 0;
+        font-weight: 600;
     }
     </style>
 """, unsafe_allow_html=True)
 
-# ================= MENU SUPERIOR =================
+# ===== MENU SUPERIOR =====
 st.markdown("""
-<div class="menu">
-    <a href="../app">Menu</a>
-    <a href="./Mapas">Mapas</a>
-    <a href="./Criacao_Mapas" class="active">Criação de Mapas</a>
-    <a href="./Parâmetros">Parâmetros</a>
-    <a href="./Resultados">Resultados</a>
-    <a href="./Documentação">Documentação</a>
-</div>
+    <div class="menu">
+        <a href="/">Menu</a>
+        <a href="/Mapas">Mapas</a>
+        <a class="active" href="/Criação_de_Mapas">Criação de Mapas</a>
+        <a href="/Parâmetros">Parâmetros</a>
+        <a href="/Simulação">Simulação</a>
+        <a href="/Resultados">Resultados</a>
+        <a href="/Documentação">Documentação</a>
+    </div>
 """, unsafe_allow_html=True)
 
-# ================= TÍTULO =================
-st.markdown('<div class="titulo">CRIAÇÃO DE MAPAS</div>', unsafe_allow_html=True)
-st.markdown('<div class="linha"></div>', unsafe_allow_html=True)
+# ===== CABEÇALHO DA PÁGINA =====
+st.markdown("""
+    <div class="page-header">
+        <h1>🎨 Criação de Mapas</h1>
+        <p>Crie mapas personalizados usando o editor gráfico ou converta imagens existentes</p>
+    </div>
+""", unsafe_allow_html=True)
 
 # ================= CONFIGURAÇÕES INICIAIS =================
 # Obter esquema de cores do serviço
@@ -189,27 +210,38 @@ with tab1:
     """)
     
     # Configurações do mapa
-    col1, col2, col3, col4 = st.columns(4)
+    col1, col2, col3 = st.columns(3)
     with col1:
         width_px = st.number_input("Largura (px)", min_value=5, max_value=200, value=20, help="Largura do mapa em pixels (colunas)")
     with col2:
         height_px = st.number_input("Altura (px)", min_value=5, max_value=200, value=20, help="Altura do mapa em pixels (linhas)")
     with col3:
         cell_size = st.number_input("Tamanho do pixel", min_value=10, max_value=50, value=25, help="Tamanho visual de cada pixel")
-    with col4:
-        template = st.selectbox("Template", ["empty", "room", "corridor"], 
-                              help="Template inicial para o mapa")
+    
+    st.markdown("---")
     
     # Mostrar esquema de cores
-    st.markdown("#### 🎨 Esquema de Cores Suportado:")
-    for name, (rgb, hex_color, code) in COLORS.items():
-        st.markdown(f"**{name}** (RGB: {rgb}) → Código: `{code}`")
+    st.markdown("#### 🎨 Esquema de Cores Suportado")
+    
+    cols = st.columns(len(COLORS))
+    for idx, (name, (rgb, hex_color, code)) in enumerate(COLORS.items()):
+        with cols[idx]:
+            st.markdown(f"""
+            <div style="text-align: center; padding: 1rem; background: rgba(26, 26, 46, 0.3); border-radius: 8px;">
+                <div style="width: 40px; height: 40px; background-color: {hex_color}; border: 2px solid #667eea; border-radius: 6px; margin: 0 auto 0.5rem;"></div>
+                <p style="color: #667eea; font-weight: 600; margin: 0.25rem 0;">{name}</p>
+                <p style="color: #aaa; font-size: 0.8rem; margin: 0;">RGB: {rgb}</p>
+                <p style="color: #aaa; font-size: 0.8rem; margin: 0;">Código: {code}</p>
+            </div>
+            """, unsafe_allow_html=True)
+    
+    st.markdown("---")
     
     # Botões de ação
     col1, col2 = st.columns(2)
     
     with col1:
-        if st.button("🚀 Abrir Editor Gráfico", help="Abre o editor Tkinter com as configurações acima"):
+        if st.button("🚀 Abrir Editor Gráfico", help="Abre o editor Tkinter com as configurações acima", use_container_width=True):
             with st.spinner("Abrindo editor gráfico..."):
                 success = tkinter_map_editor_service.launch_tkinter_editor(width_px, height_px, cell_size)
                 if success:
@@ -219,7 +251,7 @@ with tab1:
                     st.error("❌ Erro ao abrir editor gráfico. Verifique se o Tkinter está disponível.")
     
     with col2:
-        if st.button("🎯 Editor Padrão", help="Abre o editor com configuração padrão"):
+        if st.button("🎯 Editor Padrão (20x20)", help="Abre o editor com configuração padrão", use_container_width=True):
             with st.spinner("Abrindo editor padrão..."):
                 success = tkinter_map_editor_service.launch_simple_editor()
                 if success:
@@ -438,7 +470,6 @@ with st.expander("🎨 Guia de Cores"):
     - **Espaço vazio (Branco)**: Áreas onde pessoas podem caminhar
     - **Tapete/Caminho (Laranja)**: Caminhos preferenciais ou áreas especiais
     - **Porta/Saída (Vermelho)**: Saídas de emergência
-    - **Janelas (Verde)**: Aberturas ou janelas
     - **Inocupável (Prata)**: Áreas que não podem ser ocupadas
     
     **Dicas:**

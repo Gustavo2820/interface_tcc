@@ -135,6 +135,7 @@ if st.session_state.get('nsga_config_loaded', False):
                 st.markdown("### 🎯 Parâmetros de Simulação")
                 scenario_seed = st.number_input("Seed do cenário", min_value=0, value=current_sim_params.get('scenario_seed', 42), help="Seed para geração do cenário")
                 simulation_seed = st.number_input("Seed da simulação", min_value=0, value=current_sim_params.get('simulation_seed', 123), help="Seed para execução da simulação")
+                max_iterations = st.number_input("Iterações máximas", min_value=100, max_value=10000, value=current_sim_params.get('max_iterations', 1200), step=100, help="Número máximo de iterações por simulação (padrão: 1200)")
                 draw_mode = st.checkbox("Gerar imagens", value=current_sim_params.get('draw_mode', True), help="Gerar imagens de saída da simulação")
                 verbose = st.checkbox("Modo verboso", value=current_sim_params.get('verbose', False), help="Exibir informações detalhadas durante execução")
             
@@ -155,6 +156,7 @@ if st.session_state.get('nsga_config_loaded', False):
                     "simulation_params": {
                         "scenario_seed": int(scenario_seed),
                         "simulation_seed": int(simulation_seed),
+                        "max_iterations": int(max_iterations),
                         "draw_mode": bool(draw_mode),
                         "verbose": bool(verbose)
                     },

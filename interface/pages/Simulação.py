@@ -59,6 +59,249 @@ from services.bruteforce_integration import get_bruteforce_integration
 # ================= CONFIGURAÇÃO DA PÁGINA =================
 st.set_page_config(page_title="Simulação", layout="wide")
 
+# ================= CSS E CABEÇALHO DECORATIVO =================
+st.markdown("""
+    <style>
+    /* ===== MENU SUPERIOR ===== */
+    .menu {
+        display: flex;
+        justify-content: center;
+        gap: 40px;
+        margin-bottom: 40px;
+        font-size: 18px;
+        font-weight: 500;
+    }
+    .menu a {
+        text-decoration: none;
+        color: #aaa;
+        transition: color 0.2s;
+    }
+    .menu a:hover {
+        color: #fff;
+    }
+    .menu a.active {
+        color: #fff;
+        font-weight: 600;
+        border-bottom: 2px solid #1e90ff;
+        padding-bottom: 4px;
+    }
+    
+    /* ===== CABEÇALHO DA PÁGINA ===== */
+    .page-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        padding: 2rem;
+        border-radius: 15px;
+        margin-bottom: 2rem;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+    }
+    .page-header h1 {
+        color: white;
+        margin: 0;
+        font-size: 2.5rem;
+        font-weight: 700;
+    }
+    .page-header p {
+        color: rgba(255,255,255,0.9);
+        margin: 0.5rem 0 0 0;
+        font-size: 1.1rem;
+    }
+    
+    /* ===== PREVIEW DO MAPA ===== */
+    .map-preview {
+        border: 3px solid #667eea;
+        border-radius: 12px;
+        padding: 20px;
+        background: #1a1a2e;
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+    }
+    .map-preview-title {
+        color: #667eea;
+        font-weight: 600;
+        font-size: 1.1rem;
+        margin-bottom: 10px;
+        text-align: center;
+    }
+    
+    /* ===== QUALIDADE DE IMAGEM ===== */
+    .map-preview img, .map-preview .map-img {
+        width: 100%;
+        height: auto;
+        min-height: 300px;
+        max-height: 600px;
+        object-fit: contain;
+        image-rendering: -webkit-optimize-contrast;
+        image-rendering: crisp-edges;
+        image-rendering: pixelated;
+        border-radius: 8px;
+        display: block;
+        margin: 0 auto;
+    }
+    img {
+        image-rendering: -webkit-optimize-contrast;
+        image-rendering: crisp-edges;
+        image-rendering: pixelated;
+    }
+    [data-testid="stImage"] img {
+        image-rendering: -webkit-optimize-contrast !important;
+        image-rendering: crisp-edges !important;
+        image-rendering: pixelated !important;
+        object-fit: contain !important;
+    }
+    
+    /* ===== SEÇÕES ===== */
+    .section-divider {
+        border-top: 2px solid #667eea;
+        margin: 2rem 0;
+        opacity: 0.3;
+    }
+    
+    /* ===== BOTÕES ===== */
+    .stButton button {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        font-weight: 600;
+        border-radius: 8px;
+        padding: 10px 24px;
+        font-size: 16px;
+        border: none;
+        transition: 0.2s ease-in-out;
+        box-shadow: 0 3px 10px rgba(0,0,0,0.3);
+    }
+    .stButton button:hover {
+        transform: scale(1.05);
+        box-shadow: 0 5px 15px rgba(102, 126, 234, 0.5);
+    }
+    
+    /* ===== BOTÃO FIXO DE EXECUÇÃO ===== */
+    .fixed-button-container {
+        position: fixed;
+        bottom: 30px;
+        right: 30px;
+        z-index: 999;
+        animation: pulse 2s infinite;
+    }
+    
+    .fixed-exec-button {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+        color: white !important;
+        font-size: 18px !important;
+        font-weight: 700 !important;
+        padding: 16px 40px !important;
+        border-radius: 50px !important;
+        border: none !important;
+        box-shadow: 0 8px 25px rgba(102, 126, 234, 0.6) !important;
+        cursor: pointer !important;
+        transition: all 0.3s ease !important;
+        text-decoration: none !important;
+        display: inline-block !important;
+    }
+    
+    .fixed-exec-button:hover {
+        transform: scale(1.1) !important;
+        box-shadow: 0 12px 35px rgba(102, 126, 234, 0.8) !important;
+    }
+    
+    @keyframes pulse {
+        0%, 100% {
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.6);
+        }
+        50% {
+            box-shadow: 0 8px 35px rgba(102, 126, 234, 0.9);
+        }
+    }
+    
+    /* ===== BOTÃO DE EXECUÇÃO PRINCIPAL ===== */
+    button[kind="primary"] {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+        font-size: 18px !important;
+        font-weight: 700 !important;
+        padding: 14px 32px !important;
+        box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4) !important;
+    }
+    button[kind="primary"]:hover {
+        transform: scale(1.08) !important;
+        box-shadow: 0 8px 25px rgba(102, 126, 234, 0.6) !important;
+    }
+    
+    /* ===== EXPANDERS ===== */
+    .streamlit-expanderHeader {
+        background-color: #1a1a2e !important;
+        border-radius: 8px;
+        font-weight: 600;
+    }
+    
+    /* ===== CARDS ===== */
+    .info-card {
+        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+        padding: 1.5rem;
+        border-radius: 12px;
+        border-left: 4px solid #667eea;
+        margin: 1rem 0;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    }
+    
+    /* ===== MÉTRICAS ===== */
+    [data-testid="stMetricValue"] {
+        font-size: 2rem;
+        font-weight: 700;
+        color: #667eea;
+    }
+    
+    /* ===== TÍTULOS DE SEÇÃO ===== */
+    h3 {
+        color: #667eea;
+        border-bottom: 2px solid rgba(102, 126, 234, 0.3);
+        padding-bottom: 0.5rem;
+        margin-top: 2rem;
+    }
+    
+    /* ===== ESPAÇAMENTO GERAL ===== */
+    .block-container {
+        padding-top: 2rem;
+        padding-bottom: 3rem;
+    }
+    
+    /* ===== FORMULÁRIO =====  */
+    .stForm {
+        background: rgba(26, 26, 46, 0.3);
+        border-radius: 10px;
+        padding: 1.5rem;
+        border: 1px solid rgba(102, 126, 234, 0.2);
+    }
+    </style>
+""", unsafe_allow_html=True)
+
+# ===== MENU SUPERIOR =====
+st.markdown("""
+    <div class="menu">
+        <a href="/">Menu</a>
+        <a href="/Mapas">Mapas</a>
+        <a href="/Criação_de_Mapas">Criação de Mapas</a>
+        <a href="/Parâmetros">Parâmetros</a>
+        <a class="active" href="/Simulação">Simulação</a>
+        <a href="/Resultados">Resultados</a>
+        <a href="/Documentação">Documentação</a>
+    </div>
+""", unsafe_allow_html=True)
+
+# ===== CABEÇALHO DA PÁGINA =====
+st.markdown("""
+    <div class="page-header">
+        <h1>🎯 Simulação de Evacuação</h1>
+        <p>Configure e execute simulações com diferentes algoritmos de otimização</p>
+    </div>
+""", unsafe_allow_html=True)
+
+# ================= FUNÇÕES =================
+def start_simulation():
+    st.session_state.run_sim = True
+
+# ================= BOTÃO DE EXECUÇÃO NO TOPO =================
+col_top1, col_top2, col_top3 = st.columns([3, 2, 3])
+with col_top2:
+    st.button("▶️ EXECUTAR SIMULAÇÃO", on_click=start_simulation, type="primary", use_container_width=True, key="exec_button_top")
+st.markdown("---")
+
 # ================= INICIALIZAÇÃO DOS SERVIÇOS =================
 if 'simulator_integration' not in st.session_state:
     st.session_state.simulator_integration = SimulatorIntegration()
@@ -148,51 +391,42 @@ else:
     if preselected_map:
         prefill_mapa = preselected_map
 
-# ================= FUNÇÕES =================
-def start_simulation():
-    st.session_state.run_sim = True
-
+# ================= FUNÇÕES AUXILIARES =================
 def quantize_map_colors(image_path):
+    """
+    Força cores da imagem para serem exatamente as cores válidas do simulador.
+    Aceita variações de cinza (128,128,128 e 192,192,192) como inocupável.
+    """
     valid_colors = {
         "wall": np.array([0,0,0]),
         "door": np.array([255,0,0]),
         "empty": np.array([255,255,255]),
         "drawing": np.array([255,165,0]),
-        "window": np.array([0,255,0])
+        "inocupavel": np.array([192,192,192]),
+        "inocupavel_alt": np.array([128,128,128])  # Cinza alternativo
     }
+    
+    # Mapeamento de cores alternativas para cores principais
+    color_mapping = {
+        "inocupavel_alt": "inocupavel"  # Mapeia cinza escuro para cinza claro
+    }
+    
     img = Image.open(image_path).convert("RGB")
     arr = np.array(img)
+    
     def closest_color(pixel):
         distances = {name: np.sum((pixel - col)**2) for name, col in valid_colors.items()}
-        return valid_colors[min(distances, key=distances.get)]
+        closest_name = min(distances, key=distances.get)
+        # Se for uma cor alternativa, usa a cor principal mapeada
+        if closest_name in color_mapping:
+            return valid_colors[color_mapping[closest_name]]
+        return valid_colors[closest_name]
+    
     new_arr = np.zeros_like(arr)
     for i in range(arr.shape[0]):
         for j in range(arr.shape[1]):
             new_arr[i,j] = closest_color(arr[i,j])
     Image.fromarray(new_arr).save(image_path)
-
-# ================= MENU SUPERIOR =================
-st.markdown("""
-<div style="display:flex; gap:30px; margin-bottom:20px;">
-    <a href="../app">Menu</a>
-    <a href="./Mapas" style="font-weight:bold;">Mapas</a>
-    <a href="./Criacao_Mapas">Criação de Mapas</a>
-    <a href="./Parâmetros">Parâmetros</a>
-    <a href="./Resultados">Resultados</a>
-    <a href="./Documentação">Documentação</a>
-</div>
-""", unsafe_allow_html=True)
-
-# ================= BOTÕES =================
-col_btn1, col_btn2, col_btn3 = st.columns([1,1,1])
-with col_btn1:
-    if st.button("💾 Salvar Configuração"):
-        st.success("Configuração salva!")
-with col_btn2:
-    st.button("▶️ Executar Simulação", on_click=start_simulation)
-with col_btn3:
-    if st.button("📊 Ver Resultados"):
-        st.session_state.view_results = True
 
 # ================= FORMULÁRIO PRINCIPAL =================
 col1, col2 = st.columns([1,3])
@@ -209,125 +443,270 @@ with col1:
             default_map_index = 0
     selected_map = st.selectbox("Mapa", options=map_options_with_placeholder, index=default_map_index)
     mapa_nome = selected_map if selected_map != "(selecione)" else None
-
-    # Upload de configuração unificada
-    uploaded_config_file = st.file_uploader("Carregar configuração (.json)", type=["json"], 
-                                           help="Arquivo de configuração unificada (recomendado) ou formato legado")
-    config_uploaded_path = None
     
-    if uploaded_config_file:
-        try:
-            config_dir = Path("uploads")/"configs"
-            config_dir.mkdir(parents=True, exist_ok=True)
-            from datetime import datetime as _dt
-            config_path = config_dir / f"config_{_dt.now().strftime('%Y%m%d_%H%M%S')}.json"
-            config_path.write_text(uploaded_config_file.read().decode('utf-8'))
-            config_uploaded_path = config_path
-            
-            # Carrega configuração
-            if algorithm in ["NSGA-II", "NSGA-II com Cache"]:
-                if st.session_state.nsga_integration.load_configuration(config_path):
-                    st.success("Configuração carregada com sucesso!")
-                    if st.session_state.nsga_integration.is_unified_config():
-                        st.info("✅ **Formato unificado detectado** - parâmetros de simulação incluídos!")
-                        sim_params = st.session_state.nsga_integration.get_simulation_params()
-                        if sim_params:
-                            st.json(sim_params)
-                    else:
-                        st.warning("⚠️ **Formato legado detectado** - apenas parâmetros NSGA-II")
-                        st.info("💡 Considere usar o formato unificado para incluir parâmetros de simulação!")
-                else:
-                    st.error("Falha ao carregar configuração")
-            else:
-                # Para outros algoritmos, carrega parâmetros diretamente
-                loaded_config = json.loads(config_path.read_text())
-                for k, v in loaded_config.items():
-                    st.session_state[k] = v
-                st.success("Configuração carregada!")
-        except Exception as e:
-            st.error(f"Erro ao carregar configuração: {e}")
+    # Salva o mapa selecionado no session_state para preview
+    if mapa_nome:
+        st.session_state.selected_map_name = mapa_nome
 
-    # Formulário unificado de criação de configuração
-    with st.expander("⚙️ Criar/Editar Configuração Unificada"):
+with col1:
+    # ===== SELETOR DE PRESETS =====
+    st.markdown("##### 🎨 Carregar Preset Rápido")
+    presets_dir = Path("presets")
+    preset_files = sorted(presets_dir.glob("*.json")) if presets_dir.exists() else []
+    
+    # Initialize loaded_preset in session_state if not present
+    if 'loaded_preset' not in st.session_state:
+        st.session_state.loaded_preset = {}
+    
+    if preset_files:
+        preset_options = ["(nenhum)"] + [p.stem for p in preset_files]
+        selected_preset = st.selectbox(
+            "Preset de Parâmetros",
+            preset_options,
+            help="Carregue rapidamente configurações pré-definidas"
+        )
+        
+        if selected_preset != "(nenhum)":
+            preset_path = presets_dir / f"{selected_preset}.json"
+            if st.button(f"📥 Carregar '{selected_preset}'", use_container_width=True):
+                try:
+                    preset_data = json.loads(preset_path.read_text())
+                    
+                    # Carrega preset para o session_state para preencher o formulário
+                    st.session_state.loaded_preset = preset_data
+                    
+                    # Também carrega para NSGA se aplicável
+                    if algorithm in ["NSGA-II", "NSGA-II com Cache"]:
+                        temp_config_path = Path("uploads/configs") / f"preset_{selected_preset}.json"
+                        temp_config_path.parent.mkdir(parents=True, exist_ok=True)
+                        temp_config_path.write_text(json.dumps(preset_data, indent=2))
+                        st.session_state.nsga_integration.load_configuration(temp_config_path)
+                    
+                    st.success(f"✅ Preset '{selected_preset}' carregado! Edite os valores abaixo se necessário.")
+                    st.info(f"📝 {preset_data.get('description', '')}")
+                    
+                except Exception as e:
+                    st.error(f"Erro ao carregar preset: {e}")
+    else:
+        st.info("💡 Nenhum preset encontrado. Crie presets na página **Parâmetros**")
+    
+    st.markdown("---")
+    
+    # Formulário unificado de criação/edição de configuração
+    with st.expander("⚙️ Criar/Editar Configuração Unificada", expanded=True):
         st.markdown("**💡 Formato Unificado**: Combina parâmetros do algoritmo e de simulação em um único arquivo")
         
+        # Extract values from loaded preset if available (com verificação de None)
+        loaded_preset = st.session_state.get('loaded_preset')
+        if loaded_preset is None:
+            loaded_preset = {}
+        
+        nsga_cfg = loaded_preset.get('nsga_config', {})
+        sim_params = loaded_preset.get('simulation_params', {})
+        bf_cfg = loaded_preset.get('bruteforce_config', {})
+        
         with st.form("form_unified_config"):
-            col1, col2 = st.columns(2)
+            col_form1, col_form2 = st.columns(2)
             
-            with col1:
+            with col_form1:
                 st.markdown("### 🧬 Parâmetros do Algoritmo")
                 if algorithm in ["NSGA-II", "NSGA-II com Cache"]:
-                    population_size = st.number_input("Tamanho da população", min_value=2, value=20, help="Número de indivíduos na população")
-                    generations = st.number_input("Número de gerações", min_value=1, value=10, help="Número de gerações para evolução")
-                    crossover_rate = st.number_input("Taxa de crossover", min_value=0.0, max_value=1.0, value=0.8, step=0.05, help="Probabilidade de crossover")
-                    mutation_rate = st.number_input("Taxa de mutação", min_value=0.0, max_value=1.0, value=0.1, step=0.05, help="Probabilidade de mutação")
+                    population_size = st.number_input(
+                        "Tamanho da população", 
+                        min_value=2, 
+                        value=nsga_cfg.get('population_size', 20), 
+                        help="Número de indivíduos na população"
+                    )
+                    generations = st.number_input(
+                        "Número de gerações", 
+                        min_value=1, 
+                        value=nsga_cfg.get('generations', 10), 
+                        help="Número de gerações para evolução"
+                    )
+                    crossover_rate = st.number_input(
+                        "Taxa de crossover", 
+                        min_value=0.0, 
+                        max_value=1.0, 
+                        value=float(nsga_cfg.get('crossover_rate', 0.8)), 
+                        step=0.05, 
+                        help="Probabilidade de crossover"
+                    )
+                    mutation_rate = st.number_input(
+                        "Taxa de mutação", 
+                        min_value=0.0, 
+                        max_value=1.0, 
+                        value=float(nsga_cfg.get('mutation_rate', 0.1)), 
+                        step=0.05, 
+                        help="Probabilidade de mutação"
+                    )
+                    # use_three_objectives SEMPRE True - não mostra checkbox, apenas informa
+                    use_three_obj = True
+                    
+                elif algorithm == "Força Bruta":
+                    max_doors = st.number_input(
+                        "Máximo de portas", 
+                        min_value=1, 
+                        value=bf_cfg.get('max_doors', 15), 
+                        help="Número máximo de portas a testar"
+                    )
                 else:
                     # Parâmetros para outros algoritmos
                     pop_size = st.number_input("Tamanho da população", min_value=1, value=10, help="Número de indivíduos")
                     mut_prob = st.number_input("Probabilidade de mutação", min_value=0.0, max_value=1.0, value=0.4, step=0.01, help="Taxa de mutação")
                     max_gen = st.number_input("Máximo de gerações", min_value=1, value=300, help="Número máximo de gerações")
             
-            with col2:
+            with col_form2:
                 st.markdown("### 🎯 Parâmetros de Simulação")
-                scenario_seed = st.number_input("Seed do cenário", min_value=0, value=42, help="Seed para geração do cenário")
-                simulation_seed = st.number_input("Seed da simulação", min_value=0, value=123, help="Seed para execução da simulação")
-                draw_mode = st.checkbox("Gerar imagens", value=True, help="Gerar imagens de saída da simulação")
-                verbose = st.checkbox("Modo verboso", value=False, help="Exibir informações detalhadas durante execução")
+                
+                # Handle scenario_seed (can be int or list)
+                scenario_seed_val = sim_params.get('scenario_seed', 42)
+                if isinstance(scenario_seed_val, list):
+                    scenario_seed_str = ",".join(map(str, scenario_seed_val))
+                else:
+                    scenario_seed_str = str(scenario_seed_val)
+                
+                scenario_seed_input = st.text_input(
+                    "Seed(s) do cenário",
+                    value=scenario_seed_str,
+                    help="Um único seed (ex: 42) ou múltiplos seeds separados por vírgula (ex: 1,2,3)"
+                )
+                
+                simulation_seed = st.number_input(
+                    "Seed da simulação", 
+                    min_value=0, 
+                    value=sim_params.get('simulation_seed', 123), 
+                    help="Seed para execução da simulação"
+                )
+                max_iterations = st.number_input(
+                    "Máximo de iterações",
+                    min_value=100,
+                    max_value=10000,
+                    value=sim_params.get('max_iterations', 1200),
+                    step=100,
+                    help="Número máximo de iterações por simulação"
+                )
+                draw_mode = st.checkbox(
+                    "Gerar imagens", 
+                    value=sim_params.get('draw_mode', True), 
+                    help="Gerar imagens de saída da simulação"
+                )
+                verbose = st.checkbox(
+                    "Modo verboso", 
+                    value=sim_params.get('verbose', False), 
+                    help="Exibir informações detalhadas durante execução"
+                )
             
-            description = st.text_input("Descrição da configuração", value=f"Configuração para {algorithm}", help="Descrição opcional da configuração")
+            description = st.text_input(
+                "Descrição da configuração", 
+                value=loaded_preset.get('description', f"Configuração para {algorithm}"), 
+                help="Descrição opcional da configuração"
+            )
             
-            submit_config = st.form_submit_button("💾 Salvar Configuração Unificada")
+            col_btn1, col_btn2 = st.columns(2)
+            with col_btn1:
+                submit_config = st.form_submit_button("💾 Salvar e Usar Configuração", use_container_width=True)
+            with col_btn2:
+                clear_preset = st.form_submit_button("🗑️ Limpar Preset", use_container_width=True)
+        
+        if clear_preset:
+            st.session_state.loaded_preset = {}
+            st.success("Preset limpo! Valores padrão restaurados.")
+            st.rerun()
         
         if submit_config:
             try:
                 config_dir = Path("uploads")/"configs"
                 config_dir.mkdir(parents=True, exist_ok=True)
                 
+                # Parse scenario_seed (pode ser único ou lista)
+                scenario_seed_parsed = None
+                try:
+                    if ',' in scenario_seed_input:
+                        scenario_seed_parsed = [int(s.strip()) for s in scenario_seed_input.split(',')]
+                    else:
+                        scenario_seed_parsed = int(scenario_seed_input.strip())
+                except Exception:
+                    st.error("Formato inválido para scenario_seed. Use um número ou números separados por vírgula.")
+                    scenario_seed_parsed = 42
+                
                 if algorithm in ["NSGA-II", "NSGA-II com Cache"]:
                     # Formato unificado para NSGA-II
                     unified_config = {
+                        "preset_name": f"{algorithm}_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
+                        "description": description,
                         "nsga_config": {
                             "population_size": int(population_size),
                             "generations": int(generations),
                             "crossover_rate": float(crossover_rate),
-                            "mutation_rate": float(mutation_rate)
+                            "mutation_rate": float(mutation_rate),
+                            "use_three_objectives": bool(use_three_obj)
                         },
                         "simulation_params": {
-                            "scenario_seed": int(scenario_seed),
+                            "scenario_seed": scenario_seed_parsed,
                             "simulation_seed": int(simulation_seed),
+                            "max_iterations": int(max_iterations),
                             "draw_mode": bool(draw_mode),
                             "verbose": bool(verbose)
                         },
-                        "description": description
+                        "bruteforce_config": {
+                            "max_doors": 15  # default para compatibilidade
+                        }
+                    }
+                elif algorithm == "Força Bruta":
+                    # Formato unificado para Força Bruta
+                    unified_config = {
+                        "preset_name": f"BruteForce_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
+                        "description": description,
+                        "bruteforce_config": {
+                            "max_doors": int(max_doors)
+                        },
+                        "simulation_params": {
+                            "scenario_seed": scenario_seed_parsed,
+                            "simulation_seed": int(simulation_seed),
+                            "max_iterations": int(max_iterations),
+                            "draw_mode": bool(draw_mode),
+                            "verbose": bool(verbose)
+                        },
+                        "nsga_config": {
+                            "population_size": 20,  # defaults para compatibilidade
+                            "generations": 10,
+                            "crossover_rate": 0.8,
+                            "mutation_rate": 0.1,
+                            "use_three_objectives": True  # SEMPRE True
+                        }
                     }
                 else:
                     # Formato unificado para outros algoritmos
                     unified_config = {
+                        "preset_name": f"{algorithm}_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
+                        "description": description,
                         "algorithm_params": {
                             "pop_size": int(pop_size),
                             "mut_prob": float(mut_prob),
                             "max_gen": int(max_gen)
                         },
                         "simulation_params": {
-                            "scenario_seed": int(scenario_seed),
+                            "scenario_seed": scenario_seed_parsed,
                             "simulation_seed": int(simulation_seed),
+                            "max_iterations": int(max_iterations),
                             "draw_mode": bool(draw_mode),
                             "verbose": bool(verbose)
-                        },
-                        "description": description
+                        }
                     }
                 
                 # Salva configuração
-                from datetime import datetime as _dt
-                config_path = config_dir / f"unified_config_{algorithm.lower().replace(' ', '_')}_{_dt.now().strftime('%Y%m%d_%H%M%S')}.json"
+                config_path = config_dir / f"unified_config_{algorithm.lower().replace(' ', '_').replace('-', '_')}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
                 config_path.write_text(json.dumps(unified_config, indent=2))
                 
                 # Carrega configuração se for NSGA-II ou NSGA-II com Cache
                 if algorithm in ["NSGA-II", "NSGA-II com Cache"]:
                     st.session_state.nsga_integration.load_configuration(config_path)
+                elif algorithm == "Força Bruta":
+                    st.session_state.bruteforce_integration.load_configuration(config_path)
                 
-                st.success(f"✅ Configuração unificada salva em: `{config_path}`")
-                st.json(unified_config)
+                st.success(f"✅ Configuração unificada salva e carregada!")
+                with st.expander("👀 Ver Configuração Salva"):
+                    st.json(unified_config)
                 
             except Exception as e:
                 st.error(f"Erro ao salvar configuração: {e}")
@@ -340,125 +719,6 @@ with col1:
             st.success("Indivíduos carregados!")
         except Exception as e:
             st.error(f"Erro ao carregar indivíduos: {e}")
-
-    # ===== Label-based Individuals Editor =====
-    with st.expander("Tipos de Indivíduos (Labels)"):
-        st.markdown("Use este editor para criar tipos (labels) de indivíduos. Depois clique em Exportar para gerar o JSON unificado.")
-        c1, c2 = st.columns([2,1])
-        with c1:
-            st.text_input("Nome do label", key='tmp_label_name')
-            st.number_input("Quantidade (amount)", min_value=0, value=st.session_state.get('tmp_amount',1), key='tmp_amount')
-            cr, cg, cb = st.columns(3)
-            with cr:
-                st.number_input("R", min_value=0, max_value=255, value=st.session_state.get('tmp_r',255), key='tmp_r')
-            with cg:
-                st.number_input("G", min_value=0, max_value=255, value=st.session_state.get('tmp_g',0), key='tmp_g')
-            with cb:
-                st.number_input("B", min_value=0, max_value=255, value=st.session_state.get('tmp_b',0), key='tmp_b')
-            st.number_input("Velocidade (speed)", min_value=1, value=st.session_state.get('tmp_speed',1), key='tmp_speed')
-        with c2:
-            st.number_input("KD", min_value=0.0, value=float(st.session_state.get('tmp_KD',1.0)), step=0.1, key='tmp_KD')
-            st.number_input("KS", min_value=0.0, value=float(st.session_state.get('tmp_KS',1.0)), step=0.1, key='tmp_KS')
-            st.number_input("KW", min_value=0.0, value=float(st.session_state.get('tmp_KW',1.0)), step=0.1, key='tmp_KW')
-            st.number_input("KI", min_value=0.0, value=float(st.session_state.get('tmp_KI',0.5)), step=0.1, key='tmp_KI')
-
-        add_col, list_col = st.columns([1,2])
-        with add_col:
-            if st.button("Adicionar / Atualizar Label"):
-                label = {
-                    "label": st.session_state.tmp_label_name or "Individuo",
-                    "amount": int(st.session_state.tmp_amount),
-                    "red": int(st.session_state.tmp_r),
-                    "green": int(st.session_state.tmp_g),
-                    "blue": int(st.session_state.tmp_b),
-                    "speed": int(st.session_state.tmp_speed),
-                    "KD": float(st.session_state.tmp_KD),
-                    "KS": float(st.session_state.tmp_KS),
-                    "KW": float(st.session_state.tmp_KW),
-                    "KI": float(st.session_state.tmp_KI)
-                }
-                idx = st.session_state.label_edit_index
-                if idx is not None and idx >= 0 and idx < len(st.session_state.ind_labels):
-                    st.session_state.ind_labels[idx] = label
-                    st.session_state.label_edit_index = -1
-                    st.success("Label atualizado.")
-                else:
-                    st.session_state.ind_labels.append(label)
-                    st.success("Label adicionado.")
-                _reset_label_tmp()
-        with list_col:
-            st.markdown("#### Labels criados")
-            for i, lab in enumerate(st.session_state.ind_labels):
-                cols = st.columns([4,1,1])
-                with cols[0]:
-                    st.write(f"{lab['label']} — quantidade: {lab.get('amount',0)} — cor: ({lab.get('red')},{lab.get('green')},{lab.get('blue')})")
-                with cols[1]:
-                    if st.button("Editar", key=f"edit_{i}"):
-                        # populate tmp fields for editing
-                        st.session_state.tmp_label_name = lab.get('label','')
-                        st.session_state.tmp_amount = lab.get('amount',1)
-                        st.session_state.tmp_r = lab.get('red',255)
-                        st.session_state.tmp_g = lab.get('green',0)
-                        st.session_state.tmp_b = lab.get('blue',0)
-                        st.session_state.tmp_speed = lab.get('speed',1)
-                        st.session_state.tmp_KD = lab.get('KD',1.0)
-                        st.session_state.tmp_KS = lab.get('KS',1.0)
-                        st.session_state.tmp_KW = lab.get('KW',1.0)
-                        st.session_state.tmp_KI = lab.get('KI',0.5)
-                        st.session_state.label_edit_index = i
-                with cols[2]:
-                    if st.button("Remover", key=f"del_{i}"):
-                        st.session_state.ind_labels.pop(i)
-                        st.success("Label removido.")
-
-        # Import existing individuals_textarea if it follows the grouped 'caracterizations' schema
-        if st.button("Importar de JSON atual" ):
-            try:
-                parsed = json.loads(st.session_state.get('individuals_textarea','[]'))
-                if isinstance(parsed, dict) and 'caracterizations' in parsed:
-                    st.session_state.ind_labels = parsed.get('caracterizations', [])
-                    st.success("Labels importados do JSON atual.")
-                else:
-                    st.error("JSON atual não possui chave 'caracterizations'.")
-            except Exception as e:
-                st.error(f"Falha ao importar JSON: {e}")
-
-        # Export labels to temp_simulation/individuals.json (grouped format) and also to individuals.json expanded
-        if st.button("Exportar Labels para JSON"):
-            try:
-                tmp_dir = Path('temp_simulation')
-                tmp_dir.mkdir(exist_ok=True)
-                unified = {
-                    "description": st.session_state.get('description', f"Configuração para {simulation_name}"),
-                    "caracterizations": st.session_state.ind_labels
-                }
-                # Save grouped labels (caracterizations)
-                labels_path = tmp_dir / 'individuals_labels.json'
-                labels_path.write_text(json.dumps(unified, indent=2, ensure_ascii=False))
-
-                # Also generate an expanded individuals.json (list expanded by amount)
-                expanded = []
-                for lab in st.session_state.ind_labels:
-                    amt = int(lab.get('amount',1))
-                    for _ in range(amt):
-                        expanded.append({
-                            "label": lab.get('label','Individuo'),
-                            "color": [lab.get('red',255), lab.get('green',0), lab.get('blue',0)],
-                            "speed": int(lab.get('speed',1)),
-                            "KD": float(lab.get('KD',1.0)),
-                            "KS": float(lab.get('KS',1.0)),
-                            "KW": float(lab.get('KW',1.0)),
-                            "KI": float(lab.get('KI',0.5)),
-                            "row": 0,
-                            "col": 0
-                        })
-                expanded_path = tmp_dir / 'individuals.json'
-                expanded_path.write_text(json.dumps(expanded, indent=2, ensure_ascii=False))
-                # update textarea to reflect expanded JSON
-                st.session_state.individuals_textarea = expanded_path.read_text()
-                st.success(f"Labels exportados: {labels_path} and {expanded_path}")
-            except Exception as e:
-                st.error(f"Falha ao exportar labels: {e}")
 
     # =================== LABELS (TIPOS DE INDIVÍDUOS) ===================
     # session state for labels
@@ -700,9 +960,10 @@ with col2:
     if mapa_nome:
         mapa_path = Path("mapas") / f"{mapa_nome}.png"
         if mapa_path.exists():
-            quantize_map_colors(mapa_path)
-            img = Image.open(mapa_path).resize((800,600),Image.NEAREST)
-            st.image(img,use_column_width=False)
+            # Exibe imagem original sem processamento para manter qualidade máxima
+            # A quantização só será feita durante a execução da simulação
+            img = Image.open(mapa_path)
+            st.image(img, use_container_width=True, output_format="PNG")
         else:
             st.warning("Mapa não encontrado.")
     else:
@@ -814,53 +1075,10 @@ if st.session_state.run_sim:
                     completed_process = type("Proc", (), {"returncode": 0, "stdout": f"{algorithm} concluído", "stderr": ""})()
                 
                 elif algorithm == "Força Bruta":
-                    st.info("Iniciando execução Força Bruta...")
+                    st.info("🔍 Iniciando Brute Force...")
                     
-                    # PRÉ-VALIDAÇÃO: Conta portas agrupadas para avisos iniciais
-                    # Usa integration_api se disponível, senão conta células '2'
-                    map_template = Path(simulator_input_dir / "map.txt").read_text()
-                    
-                    # Tenta importar integration_api para contagem correta
-                    try:
-                        import sys
-                        from pathlib import Path as P
-                        simulator_api_path = P(__file__).resolve().parents[2] / "simulador_heuristica" / "simulator"
-                        if str(simulator_api_path) not in sys.path:
-                            sys.path.insert(0, str(simulator_api_path))
-                        import integration_api
-                        door_positions = integration_api.extract_doors_from_map_text(map_template)
-                        num_doors = len(door_positions)
-                        st.info(f"Mapa contém {num_doors} portas candidatas (agrupadas)")
-                    except Exception as e:
-                        # Fallback: conta células individuais '2' como estimativa conservadora
-                        num_cells = map_template.count('2')
-                        st.warning(f"⚠️ Estimativa conservadora: ~{num_cells} células de porta (pode ser menos após agrupamento)")
-                        num_doors = num_cells  # Pior caso
-                    
-                    # Aviso/erro baseado no número de portas AGRUPADAS
-                    if num_doors > 15:
-                        st.error(f"❌ Problema muito grande: {num_doors} portas (máximo: 15)")
-                        st.error(f"Combinações possíveis: 2^{num_doors} = {2**num_doors:,}")
-                        st.error("Reduza o número de portas candidatas no mapa ou use NSGA-II")
-                        raise RuntimeError(f"Problema inviável: {num_doors} portas > 15 (limite de segurança)")
-                    elif num_doors >= 12:
-                        st.warning(f"⚠️ Problema grande: {num_doors} portas")
-                        st.warning(f"Combinações: 2^{num_doors} = {2**num_doors:,}")
-                        st.warning("A execução pode demorar alguns minutos...")
-                    else:
-                        st.success(f"✓ Problema viável: {num_doors} portas (2^{num_doors} = {2**num_doors} combinações)")
-                    
-                    # Carrega configuração (se houver) ou usa defaults
-                    config_loaded = False
-                    if config_uploaded_path:
-                        try:
-                            config_loaded = st.session_state.bruteforce_integration.load_configuration(config_uploaded_path)
-                            if config_loaded:
-                                st.success("Configuração Brute Force carregada")
-                        except Exception as e:
-                            st.warning(f"Erro ao carregar config Brute Force: {e}")
-                    
-                    if not config_loaded:
+                    # Usa configuração já carregada ou defaults
+                    if not hasattr(st.session_state.bruteforce_integration, 'config') or not st.session_state.bruteforce_integration.config:
                         st.info("Usando configuração padrão para Brute Force")
                     
                     # Obtém parâmetros de simulação

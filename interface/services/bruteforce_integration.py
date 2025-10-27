@@ -178,11 +178,14 @@ class BruteForceIntegration:
         if simulation_seed is None:
             simulation_seed = self.simulation_params.get('simulation_seed', 0)
         
+        max_iterations = self.simulation_params.get('max_iterations')
+        
         return Instance(
             experiment=experiment_name,
             draw=draw,
             scenario_seed=scenario_seed,
-            simulation_seed=simulation_seed
+            simulation_seed=simulation_seed,
+            max_iterations=max_iterations
         )
     
     def run_optimization(
@@ -236,12 +239,14 @@ class BruteForceIntegration:
                 scenario_seed = [scenario_seed]
             
             simulation_seed = self.simulation_params.get('simulation_seed', 0)
+            max_iterations = self.simulation_params.get('max_iterations')
             
             instance = Instance(
                 experiment=experiment_name,
                 draw=draw,
                 scenario_seed=scenario_seed,
-                simulation_seed=simulation_seed
+                simulation_seed=simulation_seed,
+                max_iterations=max_iterations
             )
             
             # Create Brute Force algorithm
@@ -250,6 +255,7 @@ class BruteForceIntegration:
             
             # Validate problem size before running
             num_doors = len(brute_force.exits)
+            total_combinations = 2 ** num_doors
             is_valid, msg = self.validate_problem_size(num_doors)
             
             if not is_valid:
@@ -257,14 +263,20 @@ class BruteForceIntegration:
                 logger.error(msg)
                 return None
             
+            # Aviso com modal (dialog) se problema for muito grande
             if num_doors >= 12:
                 st.warning(msg)
+                # Cria um modal de confirmação
+                with st.expander("⚠️ ATENÇÃO: Problema Grande", expanded=True):
+                    st.warning(f"**Este problema possui {num_doors} portas agrupadas**")
+                    st.warning(f"**Total de combinações a avaliar: {total_combinations:,}**")
+                    st.warning("**Isso pode demorar vários minutos!**")
+                    st.info("💡 **Dica:** Para problemas grandes, considere usar NSGA-II ao invés de Brute Force.")
             else:
-                st.info(msg)
+                st.success(msg)
             
             # Run Brute Force (modifica o método pareto para retornar os resultados)
             logger.info(f"Running Brute Force for {num_doors} doors...")
-            st.info(f"⏳ Executando Brute Force ({2**num_doors:,} combinações)...")
             
             # Captura resultado do pareto (precisamos modificar ligeiramente)
             pareto_combinations, pareto_objectives = self._run_pareto_with_results(brute_force)
@@ -384,26 +396,37 @@ class BruteForceIntegration:
         from simulador_heuristica.simulator import integration_api
         
         converted = []
-        
+
         for i, (combination, objectives) in enumerate(zip(pareto_combinations, pareto_objectives)):
             # Decodifica combinação para portas selecionadas
             selected_doors = []
             for j, bit in enumerate(combination):
                 if bit and j < len(exits_info):
                     selected_doors.append(exits_info[j])
-            
+
             # Expande portas agrupadas para coordenadas individuais
             try:
                 doors_expanded = integration_api.expand_grouped_doors(selected_doors)
             except Exception as e:
                 logger.warning(f"Failed to expand doors for solution {i}: {e}")
                 doors_expanded = []
-            
+
             # Objetivos: [num_doors, iterations, distance]
             num_doors, iterations, distance = objectives
             
+            # POST-PARETO FILTER: Remove solutions with 0 doors (they don't make sense)
+            if num_doors is not None and int(num_doors) == 0:
+                logger.debug(f"Filtering out 0-door BruteForce solution {i} from Pareto front")
+                continue
+
+            # Objetivos: [num_doors, iterations, distance]
+            num_doors, iterations, distance = objectives
+
+            # Use original solution id (preserve indexing)
+            solution_id = i
+
             result_obj = {
-                "solution_id": i,
+                "solution_id": solution_id,
                 "gene": list(combination),
                 "door_positions": doors_expanded,
                 "door_positions_grouped": selected_doors,
@@ -413,7 +436,7 @@ class BruteForceIntegration:
                 "distance": float(distance),
                 "algorithm": "BruteForce"
             }
-            
+
             converted.append(result_obj)
         
         logger.info(f"Converted {len(converted)} Brute Force results to standard format")
