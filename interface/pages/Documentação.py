@@ -129,13 +129,9 @@ with tab1:
     
     **Opção A: Criar Novo Mapa**
     1. Acesse `Criação de Mapas` no menu
-    2. Defina as dimensões (recomendado: 15x15 a 30x30)
-    3. Escolha um template inicial:
-       - **Vazio**: Canvas em branco
-       - **Sala**: Sala com paredes externas
-       - **Corredor**: Corredor simples
-    4. Use o editor de pixels para personalizar
-    5. Salve o mapa com um nome descritivo
+    2. Defina as dimensões
+    3. Use o editor de pixels para personalizar
+    4. Salve o mapa com um nome descritivo
     
     **Opção B: Converter Imagem PNG**
     1. Crie uma imagem PNG com o esquema de cores
@@ -181,7 +177,6 @@ with tab1:
     2. Selecione a simulação na lista
     3. Visualize:
        - **Métricas**: Iterações, distância, tempo
-       - **Gráficos**: Fronteira de Pareto, evolução
        - **Comparações**: Diferentes soluções
     """)
     
@@ -201,20 +196,8 @@ with tab2:
         | ⬛ Preto | (0,0,0) | **Parede** - Obstáculo sólido |
         | ⬜ Branco | (255,255,255) | **Espaço Vazio** - Área caminhável |
         | 🟧 Laranja | (255,165,0) | **Tapete** - Caminho preferencial |
-        | 🟥 Vermelho | (255,0,0) | **Porta/Saída** - Saída de emergência |
-        | 🟩 Verde | (0,255,0) | **Janela** - Saída alternativa |
+        | 🟥 Vermelho | (255,0,0) | **Porta/Saída** - Saída |
         | ⬜ Cinza | (192,192,192) | **Inocupável** - Não pode ter pedestres |
-        
-        ### Códigos do Mapa (.map)
-        
-        | Código | Terreno |
-        |--------|---------|
-        | 0 | Parede |
-        | 1 | Espaço vazio |
-        | 2 | Porta/Saída |
-        | 3 | Tapete |
-        | 4 | Janela |
-        | 5 | Inocupável |
         """)
     
     with col2:
@@ -222,8 +205,7 @@ with tab2:
         ### Dimensões Recomendadas
         
         - **Mínimo**: 5x5 pixels
-        - **Máximo**: 100x100 pixels
-        - **Ideal**: 15x15 a 30x30 pixels
+        - **Ideal**: 15x15 a 50x50 pixels
         
         ### Boas Práticas
         
@@ -235,7 +217,6 @@ with tab2:
         
         ❌ **Evite**:
         - Mapas muito grandes (lentidão)
-        - Apenas 1 saída (gargalo)
         - Corredores muito estreitos
         - Cores fora do esquema padrão
         
@@ -266,9 +247,6 @@ with tab3:
       - Mantém consistência entre execuções
     
     #### Iterações Máximas
-    - **Padrão**: 1200 iterações
-    - **Mínimo**: 100 (testes rápidos)
-    - **Máximo**: 10000 (simulações longas)
     - Afeta o tempo limite de evacuação
     
     #### Modo de Desenho
@@ -297,22 +275,29 @@ with tab3:
     - **Velocidade**: 1-10 (afeta movimento)
     - **KD, KS, KW, KI**: Pesos do modelo de força social
     
-    #### 2. JSON Manual
-    ```json
-    [
-      {
-        "label": "Adulto",
-        "color": [255, 0, 0],
-        "speed": 1,
-        "KD": 1.0,
-        "KS": 1.0,
-        "KW": 1.0,
-        "KI": 0.5,
-        "row": 0,
-        "col": 0
-      }
-    ]
-    ```
+        ### Explicação dos pesos (KD, KS, KW, KI)
+
+        Estes parâmetros controlam como cada indivíduo reage a forças modeladas na simulação (modelo de "força social"). Abaixo uma explicação em linguagem simples e dicas práticas:
+
+        - KD — Força de direção/propulsão (driving force)
+            - O quanto o indivíduo se esforça para seguir seu objetivo (ir até a saída).
+            - Valores maiores → movimento mais determinado em direção à saída (pessoa "empurrando" na direção do objetivo).
+            - Faixa sugerida: 0.0 — 5.0. Exemplo: 0.5 = passivo, 2.0 = determinado.
+
+        - KS — Força social (repulsão entre pessoas)
+            - Controla quanto o indivíduo evita colisões com outras pessoas.
+            - Valores maiores → mantém mais distância, evita aglomerações.
+            - Faixa sugerida: 0.0 — 5.0. Exemplo: 0.2 = pouco evasivo, 1.5 = evita fortemente contato.
+
+        - KW — Força de parede/obstáculo (repulsão de objetos)
+            - Determina o quanto o indivíduo evita paredes e obstáculos.
+            - Valores maiores → mantém-se mais afastado de paredes/colunas.
+            - Faixa sugerida: 0.0 — 5.0. Exemplo: 0.5 = aproxima-se de paredes, 2.0 = evita paredes.
+
+        - KI — Peso de interações internas / inércia / coesão (termo adicional de interação)
+            - Usado pelo modelo para efeitos extra (por exemplo, coesão de pequenos grupos, inércia ou componentes de ruído). A interpretação exata pode variar conforme a implementação.
+            - Valores maiores → aumentam a influência dessas interações adicionais.
+            - Faixa sugerida: 0.0 — 2.0. Exemplo: 0.0 = desativado, 0.5 — leve efeito de coesão.
     
     ---
     
@@ -335,20 +320,19 @@ with tab4:
     **Descrição**: Algoritmo genético multi-objetivo usando a biblioteca pymoo.
     
     **Quando usar**:
-    - ✅ Primeira execução com um mapa
     - ✅ Mapas médios a grandes
     - ✅ Quando quer explorar trade-offs
     
-    **Objetivos Otimizados** (sempre 3):
+    **Objetivos Otimizados**:
     1. **Minimizar portas**: Menos saídas = menor custo
     2. **Minimizar distância total**: Caminhos mais curtos
     3. **Minimizar tempo**: Evacuação mais rápida
     
     **Parâmetros**:
-    - **População**: 10-50 (recomendado: 20)
-    - **Gerações**: 5-100 (recomendado: 10-20)
-    - **Taxa de Crossover**: 0.7-0.9 (padrão: 0.8)
-    - **Taxa de Mutação**: 0.05-0.2 (padrão: 0.1)
+    - **População**
+    - **Gerações**
+    - **Taxa de Crossover**
+    - **Taxa de Mutação**
     
     ---
     
@@ -357,7 +341,7 @@ with tab4:
     **Descrição**: Versão otimizada que armazena resultados de simulações idênticas.
     
     **Quando usar**:
-    - ✅ Múltiplas execuções com mesmo mapa
+    - ✅ Múltiplas execuções
     - ✅ Quando quer economizar tempo
     - ✅ Simulações com muitas gerações
     
@@ -437,24 +421,6 @@ with tab5:
     
     ---
     
-    ### Gráficos Comuns
-    
-    #### 1. Scatter Plot (Fronteira de Pareto)
-    - **Eixo X**: Geralmente distância ou tempo
-    - **Eixo Y**: Número de portas
-    - **Pontos azuis**: Soluções da fronteira
-    - **Pontos vermelhos**: Soluções dominadas
-    
-    #### 2. Gráfico de Evolução
-    - Mostra como as métricas melhoram ao longo das gerações
-    - Convergência indica que o algoritmo encontrou boas soluções
-    
-    #### 3. Heatmap de Uso
-    - Mostra quais portas são mais utilizadas
-    - Útil para identificar gargalos
-    
-    ---
-    
     ### Exportando Resultados
     
     Os resultados são salvos automaticamente em:
@@ -464,7 +430,6 @@ with tab5:
     
     Você pode:
     - 📥 Baixar JSONs para análise externa
-    - 📊 Gerar gráficos personalizados
     - 🔄 Reexecutar simulações com mesmos parâmetros
     """)
 
@@ -474,8 +439,8 @@ st.markdown("""
 
 - 📖 **Documentação Técnica Completa**: Veja a pasta `docs/` no repositório
 - 🔧 **API Reference**: `docs/API_REFERENCE.md`
+- 🔧 **Developer Guide**: `docs/DEVELOPMENT.md`
 - 🏗️ **Arquitetura**: `docs/ARCHITECTURE.md`
-- ❓ **FAQ**: `docs/INDEX.md`
 
 ---
 

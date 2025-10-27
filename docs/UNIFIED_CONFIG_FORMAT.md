@@ -1,209 +1,101 @@
-# Formato de Configuração Unificada - NSGA-II
 
-## Visão Geral
+# Formato de Preset / Configuração Unificada
 
-O formato de configuração unificada combina parâmetros do algoritmo NSGA-II e parâmetros de simulação em um único arquivo JSON, eliminando a redundância de múltiplos arquivos de configuração.
+Este documento descreve o formato de preset usado pelo projeto. Presets ficam na pasta `presets/` e são usados pela interface e pelos scripts de integração (`setup_integration.py`) como exemplos e pontos de partida.
 
-## Estrutura do Arquivo
+Observação: os presets seguem um formato unificado que contém parâmetros de otimização (NSGA-II), parâmetros de simulação e metadados do preset.
+
+## Estrutura mínima recomendada
 
 ```json
 {
+  "preset_name": "Teste Rápido",
+  "description": "Descrição curta do preset",
   "nsga_config": {
-    "population_size": 20,
-    "generations": 10,
+    "population_size": 10,
+    "generations": 5,
     "crossover_rate": 0.8,
-    "mutation_rate": 0.1
+    "mutation_rate": 0.1,
+    "use_three_objectives": true
   },
   "simulation_params": {
     "scenario_seed": 42,
     "simulation_seed": 123,
-    "draw_mode": true,
-    "verbose": true
-  },
-  "description": "Configuração unificada para NSGA-II"
-}
-```
-
-## Parâmetros Detalhados
-
-### NSGA-II (`nsga_config`)
-
-| Parâmetro | Tipo | Range | Descrição |
-|-----------|------|-------|-----------|
-| `population_size` | integer | 5-100 | Tamanho da população |
-| `generations` | integer | 1-100 | Número de gerações |
-| `crossover_rate` | float | 0.0-1.0 | Taxa de crossover |
-| `mutation_rate` | float | 0.0-1.0 | Taxa de mutação |
-
-### Simulação (`simulation_params`)
-
-| Parâmetro | Tipo | Padrão | Descrição |
-|-----------|------|--------|-----------|
-| `scenario_seed` | integer | null | Seed para geração do cenário |
-| `simulation_seed` | integer | null | Seed para execução da simulação |
-| `draw_mode` | boolean | false | Gerar imagens de saída |
-| `verbose` | boolean | false | Modo verboso |
-
-### Geral
-
-| Parâmetro | Tipo | Descrição |
-|-----------|------|-----------|
-| `description` | string | Descrição opcional da configuração |
-
-## Exemplos de Configuração
-
-### Configuração Padrão
-```json
-{
-  "nsga_config": {
-    "population_size": 20,
-    "generations": 10,
-    "crossover_rate": 0.8,
-    "mutation_rate": 0.1
-  },
-  "simulation_params": {
-    "scenario_seed": 42,
-    "simulation_seed": 123,
-    "draw_mode": true,
-    "verbose": true
-  },
-  "description": "Configuração padrão para NSGA-II"
-}
-```
-
-### Configuração Leve (Testes Rápidos)
-```json
-{
-  "nsga_config": {
-    "population_size": 8,
-    "generations": 3,
-    "crossover_rate": 0.8,
-    "mutation_rate": 0.1
-  },
-  "simulation_params": {
-    "scenario_seed": 1,
-    "simulation_seed": 1,
+    "max_iterations": 800,
     "draw_mode": false,
     "verbose": false
   },
-  "description": "Configuração leve para testes rápidos - apenas 24 simulações"
+  "bruteforce_config": {
+    "max_doors": 10
+  },
+  "created_at": "2025-10-27T00:00:00",
+  "version": "1.0"
 }
 ```
 
-### Configuração de Produção
+## Campos e significado
+
+- `preset_name` (string) — Nome humano do preset.
+- `description` (string) — Texto livre descrevendo quando usar o preset.
+- `nsga_config` (object) — Parâmetros do algoritmo NSGA-II:
+  - `population_size` (int)
+  - `generations` (int)
+  - `crossover_rate` (float)
+  - `mutation_rate` (float)
+- `simulation_params` (object) — Parâmetros da simulação:
+  - `scenario_seed` (int | array[int]) — Seed(s) para gerar cenários; pode ser um número ou uma lista de seeds para múltiplos cenários
+  - `simulation_seed` (int) — Seed para a execução da simulação
+  - `max_iterations` (int) — Limite de iterações por simulação
+  - `draw_mode` (bool) — Se imagens/frames devem ser gerados
+  - `verbose` (bool) — Verbosidade
+- `bruteforce_config` (object, opcional) — Parâmetros usados pela integração de força bruta (por exemplo `max_doors`).
+- `created_at` (string, ISO8601) — Data de criação do preset (opcional, mas recomendado).
+- `version` (string) — Versão do schema/preset.
+
+## Regras e boas práticas
+
+- Prefira nomes claros em `preset_name` para facilitar a seleção na UI.
+- Mantenha `scenario_seed` como número quando quiser um único cenário, ou como lista quando desejar avaliar vários cenários no mesmo experimento.
+- Versione presets (campo `version`) quando alterar semanticamente os campos.
+
+## Exemplos práticos
+
+### Preset leve (Teste Rápido)
+
 ```json
 {
-  "nsga_config": {
-    "population_size": 100,
-    "generations": 50,
-    "crossover_rate": 0.9,
-    "mutation_rate": 0.05
-  },
-  "simulation_params": {
-    "scenario_seed": 12345,
-    "simulation_seed": 67890,
-    "draw_mode": true,
-    "verbose": false
-  },
-  "description": "Configuração de produção para resultados finais"
+  "preset_name": "Teste Rápido",
+  "description": "Configuração leve para testes rápidos e desenvolvimento",
+  "nsga_config": { "population_size": 10, "generations": 5, "crossover_rate": 0.8, "mutation_rate": 0.1 },
+  "simulation_params": { "scenario_seed": 42, "simulation_seed": 123, "max_iterations": 800, "draw_mode": false, "verbose": false },
+  "bruteforce_config": { "max_doors": 10 },
+  "created_at": "2025-10-27T00:00:00",
+  "version": "1.0"
 }
 ```
 
-## Compatibilidade
-
-### Formato Legado
-O sistema mantém compatibilidade com o formato legado:
+### Preset de produção (exemplo gerado a partir do template)
 
 ```json
 {
-  "population_size": 20,
-  "generations": 10,
-  "crossover_rate": 0.8,
-  "mutation_rate": 0.1,
-  "description": "Configuração legada"
+  "preset_name": "Produção Média",
+  "description": "Configuração balanceada para uso geral",
+  "nsga_config": { "population_size": 50, "generations": 30, "crossover_rate": 0.8, "mutation_rate": 0.15 },
+  "simulation_params": { "scenario_seed": 42, "simulation_seed": 123, "max_iterations": 1000, "draw_mode": true, "verbose": false },
+  "created_at": "2025-10-27T00:00:00",
+  "version": "1.0"
 }
 ```
 
-### Detecção Automática
-O sistema detecta automaticamente o formato:
-- **Formato unificado**: Contém chave `nsga_config`
-- **Formato legado**: Não contém chave `nsga_config`
+## Compatibilidade com formatos legados
 
-## Vantagens do Formato Unificado
+O código aceita formatos legados (onde os parâmetros NSGA-II estavam no nível superior) e tenta mapear para o formato unificado quando detectado.
 
-1. **Redução de Redundância**: Um único arquivo para todos os parâmetros
-2. **Facilidade de Uso**: Menos arquivos para gerenciar
-3. **Consistência**: Parâmetros relacionados agrupados logicamente
-4. **Manutenibilidade**: Mais fácil de versionar e compartilhar
-5. **Compatibilidade**: Suporte ao formato legado
+## Onde colocar os presets
 
-## Como Usar
+Coloque arquivos `.json` seguindo o schema acima em `presets/`. Prefira utilizar a interface para criar e editar presets (aba "Parâmetros)
 
-### 1. Na Interface Streamlit
-1. Acesse a página NSGA-II
-2. Faça upload do arquivo de configuração unificada
-3. O sistema detectará automaticamente o formato
-4. Configure mapa e indivíduos
-5. Execute a otimização
+## Exemplos prontos
 
-### 2. Programaticamente
-```python
-from services.nsga_integration import NSGAIntegration
+Verifique `presets/` para presets fornecidos com o repositório (por exemplo `Teste_Rapido.json`, `Producao_Media.json`, `Pesquisa_Pesada.json`).
 
-# Carrega configuração
-nsga_integration = NSGAIntegration(simulator_integration)
-nsga_integration.load_configuration(Path("unified_config.json"))
-
-# Verifica formato
-if nsga_integration.is_unified_config():
-    print("Formato unificado detectado")
-    sim_params = nsga_integration.get_simulation_params()
-    print(f"Parâmetros de simulação: {sim_params}")
-```
-
-## Migração do Formato Legado
-
-Para migrar configurações legadas para o formato unificado:
-
-1. **Identifique os parâmetros NSGA-II** no arquivo legado
-2. **Adicione parâmetros de simulação** conforme necessário
-3. **Reestruture o JSON** seguindo o formato unificado
-4. **Teste a configuração** antes de usar em produção
-
-### Exemplo de Migração
-
-**Antes (Legado):**
-```json
-{
-  "population_size": 20,
-  "generations": 10,
-  "crossover_rate": 0.8,
-  "mutation_rate": 0.1
-}
-```
-
-**Depois (Unificado):**
-```json
-{
-  "nsga_config": {
-    "population_size": 20,
-    "generations": 10,
-    "crossover_rate": 0.8,
-    "mutation_rate": 0.1
-  },
-  "simulation_params": {
-    "draw_mode": true,
-    "verbose": false
-  },
-  "description": "Migrado do formato legado"
-}
-```
-
-## Arquivos de Exemplo
-
-Os seguintes arquivos de exemplo estão disponíveis em `examples/nsga_ii/`:
-
-- `unified_config.json` - Configuração padrão
-- `unified_config_light.json` - Configuração para testes rápidos
-- `example_config.json` - Formato legado (compatibilidade)
-- `config_light.json` - Formato legado leve (compatibilidade)

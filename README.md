@@ -179,8 +179,7 @@ interface_tcc/
 ├── docs/                  # Documentação
 │   ├── ARCHITECTURE.md    # Arquitetura do sistema
 │   ├── USER_GUIDE.md      # Guia do usuário
-│   ├── API_REFERENCE.md   # Referência de API
-│   └── DEVELOPMENT.md     # Guia de desenvolvimento
+│   └── DEVELOPMENT.md     # Guia de desenvolvimento (APIs e exemplos)
 │
 ├── tests/                 # Testes automatizados
 ├── scripts/               # Scripts auxiliares
@@ -195,7 +194,7 @@ A documentação completa está disponível na pasta `docs/`:
 
 - **[ARCHITECTURE.md](docs/ARCHITECTURE.md)** - Arquitetura do sistema, fluxo de dados e componentes
 - **[USER_GUIDE.md](docs/USER_GUIDE.md)** - Guia detalhado de uso da interface
-- **[API_REFERENCE.md](docs/API_REFERENCE.md)** - Referência de APIs e integrações
+ - **[DEVELOPMENT.md](docs/DEVELOPMENT.md)** - Guia para desenvolvedores (APIs e integrações)
 - **[DEVELOPMENT.md](docs/DEVELOPMENT.md)** - Guia para desenvolvedores
 - **[UNIFIED_CONFIG_FORMAT.md](docs/UNIFIED_CONFIG_FORMAT.md)** - Formato de configuração unificada
 
@@ -254,8 +253,6 @@ Presets são configurações salvas que incluem:
 
 
 ## 📧 Contato
-
-[Adicionar informações de contato]
 
 ---
 

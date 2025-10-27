@@ -154,7 +154,7 @@ Documentação da arquitetura do Sistema de Simulação e Otimização de Evacua
 - Conversão PNG ↔ map.txt
 - Validação de mapas (dimensões, cores, portas)
 - Geração de previews
-- Codificação: 0=vazio, 1=parede, 2=porta, 3=obstáculo
+- Codificação: 0=vazio, 1=parede, 2=porta, 3=caminho
 
 ### Core do Simulador
 
@@ -272,49 +272,13 @@ Documentação da arquitetura do Sistema de Simulação e Otimização de Evacua
 - metricas (TEXT JSON)
 - data_execucao (TEXT)
 
-### Arquivos JSON
-
-**Configurações** (`presets/*.json`)
-```json
-{
-  "nsga_config": {
-    "population_size": 50,
-    "generations": 30,
-    "mutation_rate": 0.15
-  },
-  "simulation_params": {
-    "scenario_seed": [0],
-    "simulation_seed": 0,
-    "max_iterations": 1000,
-    "draw_mode": true,
-    "verbose": false
-  },
-  "description": "Descrição do preset"
-}
-```
-
-**Resultados** (`uploads/nsga_ii/*.json`)
-```json
-[
-  {
-    "objectives": [3, 450, 2345.6],
-    "door_positions": [[4, 1], [4, 2], [10, 5]],
-    "metrics": {
-      "iterations": 450,
-      "distance": 2345.6,
-      "evacuated": 100
-    }
-  }
-]
-```
-
 ### Diretórios de Dados
 
 ```
 uploads/
 ├── nsga_ii/          # Resultados de otimizações NSGA-II
 ├── forca_bruta/      # Resultados de força bruta
-└── results/          # Exportações de dados
+└── results/          # Resultados gerados (por experimento)
 
 simulador_heuristica/
 ├── input/            # Arquivos de entrada temporários
@@ -333,61 +297,6 @@ temp_nsga/            # Dados temporários de otimização
 logs/                 # Logs de execução
 mapas/                # Mapas salvos
 ```
-
-## 🎨 Padrões de Design
-
-### Factory Pattern
-
-**Uso:** `mh_ga_factory.py`
-
-- Cria objetos complexos (Scenario, Genes)
-- Encapsula lógica de instanciação
-- Cache de avaliações implementado aqui
-
-```python
-class Factory:
-    def __init__(self, instance):
-        self.instance = instance
-        self.cache = {}  # Cache de avaliações
-    
-    def decode(self, gene):
-        # Cria cenário com portas do gene
-        # Verifica cache antes de simular
-        # Retorna fitness
-```
-
-### Strategy Pattern
-
-**Uso:** Algoritmos intercambiáveis
-
-- NSGA-II pymoo
-- NSGA-II cached
-- Força bruta
-
-Interface comum via services permite trocar algoritmo sem alterar UI.
-
-### Singleton Pattern
-
-**Uso:** Services exportados
-
-```python
-# Em cada service
-class SimulatorIntegration:
-    # ... implementação
-
-# No fim do arquivo
-simulator_integration = SimulatorIntegration()  # Singleton
-```
-
-Garante instância única, evita re-inicialização.
-
-### Observer Pattern (Implícito)
-
-**Uso:** Logs e eventos
-
-- `sim_ca_logs.py` observa eventos da simulação
-- Registra em arquivo CSV
-- UI pode ler logs para acompanhar progresso
 
 ## 🔗 Integrações Externas
 
@@ -425,44 +334,3 @@ Garante instância única, evita re-inicialização.
 
 **Versão:** 1.0  
 **Atualizado:** Outubro 2024
-5. **Cálculo de objetivos**: iterations, distance, doors
-
-### Saída de Dados
-1. **res.json**: Resultados da otimização
-2. **output/**: Visualizações da simulação
-3. **resultados_*.txt**: Resultados específicos por seed
-
-## Considerações de Performance
-
-### Complexidade Assintótica
-- **NSGA-II**: O(n²) para ordenação não-dominada
-- **Força Bruta**: O(2^n) para exploração exaustiva
-- **Simulação**: O(iterations  individuals)
-
-### Otimizações Implementadas
-- **Cache**: mh_ga_factory.py implementa cache para evitar recálculos
-- **Early Termination**: sim_ca_simulator.py para quando todos evacuam
-- **Vectorization**: Uso de numpy para operações vetoriais
-
-### Gargalos Identificados
-- **h_brute_force.py**: Explosão combinatória
-- **mh_ga_nsgaii.py**: Ordenação não-dominada
-- **sim_ca_simulator.py**: Loop principal da simulação
-
-## Riscos Arquiteturais
-
-### 1. Acoplamento Alto
-- **Problema**: Módulos sim_ca_* são altamente acoplados
-- **Solução**: Implementar interfaces mais claras
-
-### 2. Cache Invalidation
-- **Problema**: Cache em mh_ga_factory.py pode ser invalidado
-- **Solução**: Implementar controle de versão do cache
-
-### 3. Memory Leaks
-- **Problema**: Múltiplas instâncias de Scenario podem vazar memória
-- **Solução**: Implementar gerenciamento de ciclo de vida
-
-### 4. Thread Safety
-- **Problema**: Módulos não são thread-safe
-- **Solução**: Implementar locks ou usar multiprocessing

@@ -109,76 +109,111 @@ def check_simulator_structure():
 
 def create_example_configs():
     """Cria arquivos de configuração de exemplo."""
-    
     # Verifica se preset directory existe
     preset_dir = Path("presets")
-    if not preset_dir.exists():
-        preset_dir.mkdir(parents=True, exist_ok=True)
-    
-    # Configuração de teste rápido
-    test_config = {
-        "nsga_config": {
-            "population_size": 20,
-            "generations": 10,
-            "mutation_rate": 0.2
-        },
-        "simulation_params": {
-            "scenario_seed": [0],
-            "simulation_seed": 0,
-            "max_iterations": 500,
-            "draw_mode": False,
-            "verbose": False
-        },
-        "description": "Configuração rápida para testes"
-    }
-    
-    # Configuração de produção média
-    production_config = {
-        "nsga_config": {
+    preset_dir.mkdir(parents=True, exist_ok=True)
+
+    import json
+    from datetime import datetime
+    import copy
+
+    template_path = preset_dir / "Teste_Rapido.json"
+
+    # If a template preset exists, load it, otherwise create a sensible default
+    if template_path.exists():
+        try:
+            with open(template_path, 'r') as f:
+                template = json.load(f)
+            print(f"✓ Preset base carregado: {template_path.name}")
+        except Exception as e:
+            print(f"⚠️ Falha ao ler {template_path}: {e}")
+            template = None
+    else:
+        # create a default lightweight template similar to previous behaviour
+        template = {
+            "preset_name": "Teste Rápido",
+            "description": "Configuração leve para testes rápidos e desenvolvimento",
+            "simulation_params": {
+                "scenario_seed": 42,
+                "simulation_seed": 123,
+                "max_iterations": 800,
+                "draw_mode": False,
+                "verbose": False
+            },
+            "nsga_config": {
+                "population_size": 10,
+                "generations": 5,
+                "crossover_rate": 0.8,
+                "mutation_rate": 0.1,
+                "use_three_objectives": True
+            },
+            "bruteforce_config": {
+                "max_doors": 10
+            },
+            "created_at": datetime.now().isoformat(),
+            "version": "1.0"
+        }
+        # write the template to disk
+        try:
+            with open(template_path, 'w') as f:
+                json.dump(template, f, indent=2, ensure_ascii=False)
+            print(f"✓ Preset base criado: {template_path.name}")
+        except Exception as e:
+            print(f"✗ Falha ao criar {template_path}: {e}")
+
+    # Build derived presets from the template
+    presets_to_create = []
+
+    # Production preset
+    prod = copy.deepcopy(template)
+    prod["preset_name"] = "Produção Média"
+    prod["description"] = "Configuração balanceada para uso geral"
+    # adjust NSGA parameters if present
+    if "nsga_config" in prod:
+        prod["nsga_config"].update({
             "population_size": 50,
             "generations": 30,
-            "mutation_rate": 0.15
-        },
-        "simulation_params": {
-            "scenario_seed": [0],
-            "simulation_seed": 0,
-            "max_iterations": 1000,
+            "mutation_rate": prod["nsga_config"].get("mutation_rate", 0.15)
+        })
+    # adjust simulation params
+    if "simulation_params" in prod:
+        prod["simulation_params"].update({
+            "max_iterations": max(prod["simulation_params"].get("max_iterations", 1000), 1000),
             "draw_mode": True,
             "verbose": False
-        },
-        "description": "Configuração balanceada para uso geral"
-    }
-    
-    # Configuração de pesquisa pesada
-    research_config = {
-        "nsga_config": {
+        })
+    prod["created_at"] = datetime.now().isoformat()
+    presets_to_create.append(("Producao_Media.json", prod))
+
+    # Research preset
+    research = copy.deepcopy(template)
+    research["preset_name"] = "Pesquisa Pesada"
+    research["description"] = "Configuração completa para pesquisa"
+    if "nsga_config" in research:
+        research["nsga_config"].update({
             "population_size": 100,
             "generations": 50,
-            "mutation_rate": 0.1
-        },
-        "simulation_params": {
-            "scenario_seed": [0],
-            "simulation_seed": 0,
-            "max_iterations": 1500,
+            "mutation_rate": research["nsga_config"].get("mutation_rate", 0.1)
+        })
+    if "simulation_params" in research:
+        research["simulation_params"].update({
+            "max_iterations": max(research["simulation_params"].get("max_iterations", 1500), 1500),
             "draw_mode": True,
             "verbose": True
-        },
-        "description": "Configuração completa para pesquisa"
-    }
-    
-    configs = [
-        ("Teste_Rapido.json", test_config),
-        ("Producao_Media.json", production_config),
-        ("Pesquisa_Pesada.json", research_config)
-    ]
-    
-    import json
-    for filename, config in configs:
+        })
+    research["created_at"] = datetime.now().isoformat()
+    presets_to_create.append(("Pesquisa_Pesada.json", research))
+
+    # Write derived presets
+    for filename, config in presets_to_create:
         config_file = preset_dir / filename
         if not config_file.exists():
-            with open(config_file, 'w') as f:
-                json.dump(config, f, indent=2)
-            print(f"✓ Preset criado: {filename}")
+            try:
+                with open(config_file, 'w') as f:
+                    json.dump(config, f, indent=2, ensure_ascii=False)
+                print(f"✓ Preset criado: {filename}")
+            except Exception as e:
+                print(f"✗ Falha ao criar {filename}: {e}")
         else:
             print(f"○ Preset já existe: {filename}")
 
@@ -233,7 +268,7 @@ def main():
         print("   - README.md (visão geral)")
         print("   - docs/USER_GUIDE.md (guia do usuário)")
         print("   - docs/ARCHITECTURE.md (arquitetura)")
-        print("   - docs/API_REFERENCE.md (referência)")
+        print("   - docs/DEVELOPMENT.md (guia do desenvolvedor - APIs e integrações)")
     else:
         print("⚠️ Configuração incompleta. Verifique os erros acima.")
         print()

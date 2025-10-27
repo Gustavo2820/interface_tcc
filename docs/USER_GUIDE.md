@@ -16,10 +16,10 @@ Guia completo para utilização da interface web do Sistema de Simulação e Oti
 
 A interface web permite:
 - Criar e gerenciar mapas de evacuação
-- Configurar parâmetros de simulação e otimização
-- Executar simulações diretas ou otimizações multiobjetivo
-- Analisar resultados e comparar soluções
-- Exportar e armazenar dados
+- Configurar parâmetros de otimização (presets e manual)
+- Executar otimizações multiobjetivo (NSGA-II Pymoo, NSGA-II Cached e Força Bruta)
+- Analisar e visualizar métricas e resultados
+- Gerir dados (SQLite e arquivos de experimento)
 
 ## 🧭 Navegação
 
@@ -39,9 +39,8 @@ A interface web permite:
    - Clique em "Criar Novo Mapa"
 
 2. **Configurar Dimensões**
-   - Largura: 5-100 células
-   - Altura: 5-100 células
-   - Tamanho padrão recomendado: 20x20
+   - Largura
+   - Altura
 
 3. **Desenhar Mapa**
    - **Branco**: Células vazias (navegáveis)
@@ -55,36 +54,8 @@ A interface web permite:
 
 5. **Salvar Mapa**
    - Dê um nome descritivo
-   - Clique em "Salvar Mapa"
+   - Clique em "Salvar no Sistema"
    - Mapa ficará disponível para uso
-
-### Importar Mapa de Imagem
-
-1. **Preparar Imagem**
-   - Formato: PNG
-   - Cores aceitas: RGB exato
-     - Branco: (255, 255, 255)
-     - Preto: (0, 0, 0)
-     - Vermelho: (255, 0, 0)
-     - Laranja: (255, 165, 0)
-
-2. **Upload**
-   - Clique em "Upload de Imagem"
-   - Selecione arquivo PNG
-   - Sistema validará automaticamente
-
-3. **Conversão**
-   - Imagem é convertida para formato .txt
-   - Visualização automática gerada
-   - Mapa salvo se válido
-
-### Validação de Mapas
-
-Requisitos automáticos verificados:
-- ✅ Tamanho entre 5x5 e 100x100
-- ✅ Pelo menos uma porta (célula vermelha)
-- ✅ Área navegável conectada
-- ✅ Cores válidas (sem pixels intermediários)
 
 ## ⚙️ Configuração de Parâmetros
 
@@ -117,22 +88,22 @@ Requisitos automáticos verificados:
 3. Escolha preset no dropdown
 4. Clique em "Carregar Configuração"
 5. Parâmetros são preenchidos automaticamente
+6. Edite os valores caso queira
 
 ### Configuração Manual
 
 **Parâmetros de Algoritmo (NSGA-II):**
 
-- **Tamanho da População**: 10-200
+- **Tamanho da População**:
   - Número de soluções por geração
   - Maior = mais diversidade, mais lento
 
-- **Número de Gerações**: 5-100
+- **Número de Gerações**:
   - Iterações do algoritmo evolutivo
   - Maior = melhor convergência, mais tempo
 
-- **Taxa de Mutação**: 0.0-1.0
+- **Taxa de Mutação**:
   - Probabilidade de mutação genética
-  - Padrão: 0.1-0.2
 
 **Parâmetros de Simulação:**
 
@@ -144,13 +115,12 @@ Requisitos automáticos verificados:
   - Reprodutibilidade da simulação
   - Afeta comportamento de indivíduos
 
-- **Iterações Máximas**: 100-2000
+- **Iterações Máximas**: 
   - Limite de passos da simulação
   - Maior = permite evacuações mais lentas
 
 - **Gerar Imagens**: Checkbox
   - Ativa/desativa geração de frames
-  - Necessário para visualizações posteriores
 
 - **Modo Verboso**: Checkbox
   - Exibe logs detalhados
@@ -209,7 +179,6 @@ Executa otimização multiobjetivo para encontrar melhores configurações de po
 Testa todas as combinações possíveis de portas.
 
 **Limitações:**
-- Apenas mapas pequenos (≤ 10 possíveis portas)
 - Tempo exponencial: 2^n combinações
 - Garante solução ótima global
 
@@ -217,7 +186,7 @@ Testa todas as combinações possíveis de portas.
 1. Selecione "Força Bruta" em Parâmetros
 2. Configure e salve
 3. Execute normalmente em Simulação
-4. Aguarde conclusão (pode ser MUITO lento)
+4. Aguarde conclusão (pode ser MUITO lento, pois cresce exponencialmente. Evite usar em mapas com mais de 10 portas.)
 
 ## 📊 Análise de Resultados
 
@@ -226,7 +195,6 @@ Testa todas as combinações possíveis de portas.
 **Tabela de Simulações:**
 - Lista todas as simulações salvas no sistema
 - Colunas: Nome, Algoritmo, Mapa, Status (Executada/Não Executada)
-- Badge visual indica status de execução
 - Botão "Visualizar" para ver detalhes
 
 **Informações Exibidas:**
@@ -263,26 +231,6 @@ O sistema usa SQLite para armazenar:
 - **Mapas**: Todos os mapas criados
 - **Resultados**: Métricas e configurações
 - **Configurações**: Presets salvos
-
-**Localização:** `database/simulacoes.db`
-
-### Estrutura de Arquivos
-
-```
-uploads/
-├── nsga_ii/          # Resultados NSGA-II
-├── forca_bruta/      # Resultados Força Bruta
-└── results/          # Exportações
-
-simulador_heuristica/
-├── input/            # Arquivos de entrada (temporários)
-└── output/           # Resultados de simulações
-    ├── <experiment>/ # Por experimento
-    └── nsga_eval_*/  # Avaliações NSGA-II
-
-temp_nsga/            # Dados temporários de otimização
-logs/                 # Logs de execução
-```
 
 ## ❓ Solução de Problemas
 
@@ -345,8 +293,6 @@ logs/                 # Logs de execução
 ### Criação de Mapas
 
 ✅ **Faça:**
-- Comece com mapas pequenos (10x10 a 20x20)
-- Teste com 2-4 portas possíveis
 - Garanta corredores de pelo menos 2 células
 - Use áreas abertas para aglomerações
 
@@ -367,7 +313,6 @@ logs/                 # Logs de execução
 ❌ **Evite:**
 - Configurações extremas sem necessidade
 - Mudanças drásticas simultâneas
-- Ignorar avisos de validação
 
 ### Otimização
 
@@ -382,7 +327,6 @@ logs/                 # Logs de execução
 - Começar com configurações muito pesadas
 - Executar overnight sem validação prévia
 - Ignorar avisos de tempo de execução estimado
-- Mudar muitos parâmetros simultaneamente
 
 ---
 
