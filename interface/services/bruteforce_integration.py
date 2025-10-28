@@ -422,13 +422,21 @@ class BruteForceIntegration:
             # Objetivos: [num_doors, iterations, distance]
             num_doors, iterations, distance = objectives
             
-            # POST-PARETO FILTER: Remove solutions with 0 doors (they don't make sense)
+            # POST-PARETO FILTER: Remove invalid solutions
             if num_doors is not None and int(num_doors) == 0:
                 logger.debug(f"Filtering out 0-door BruteForce solution {i} from Pareto front")
                 continue
-
-            # Objetivos: [num_doors, iterations, distance]
-            num_doors, iterations, distance = objectives
+            
+            # Filter out solutions with invalid distance (0 or negative)
+            if distance is not None and float(distance) <= 0:
+                logger.debug(f"Filtering out BruteForce solution {i} with invalid distance={distance}")
+                continue
+            
+            # Filter out solutions with suspicious iterations (0 when there are doors)
+            if iterations is not None and num_doors is not None:
+                if float(iterations) == 0 and int(num_doors) > 0:
+                    logger.debug(f"Filtering out BruteForce solution {i} with suspicious iterations=0 and doors={num_doors}")
+                    continue
 
             # Use original solution id (preserve indexing)
             solution_id = i

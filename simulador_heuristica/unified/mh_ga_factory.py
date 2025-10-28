@@ -59,12 +59,19 @@ class Factory(ChromosomeFactory):
         # If no doors are selected, reject/penalize this gene to avoid 0-distance artifacts.
         iters = []
         distances = []
+        
+        # Normaliza scenario_seed para lista (pode vir como int ou list)
+        if isinstance(self.instance.scenario_seed, list):
+            scenario_seeds = self.instance.scenario_seed
+        else:
+            scenario_seeds = [self.instance.scenario_seed]
+        
         if len(doors) == 0:
             # Penalty: mark as max iterations and a large distance so GA will avoid this solution.
             PENALTY_DISTANCE = 1e9
             MAX_ITERS = Simulator.MAX_ITERATIONS if hasattr(Simulator, 'MAX_ITERATIONS') else 1000
             # If multiple scenario seeds are present, apply same penalty to all
-            num_seeds = max(1, len(self.instance.scenario_seed) if hasattr(self.instance, 'scenario_seed') else 1)
+            num_seeds = len(scenario_seeds)
             iters = [MAX_ITERS] * num_seeds
             distances = [PENALTY_DISTANCE] * num_seeds
             avg_iters = sum(iters) / len(iters)
@@ -73,24 +80,19 @@ class Factory(ChromosomeFactory):
             return 0, avg_iters, avg_dist
 
         scen = Scenario(self.instance.experiment, doors, self.instance.draw,
-                            self.instance.scenario_seed[0], self.instance.simulation_seed)
+                            scenario_seeds[0], self.instance.simulation_seed, 
+                            individuals_position=False, max_iterations=self.instance.max_iterations)
         simulator = Simulator(scen)
-        # Apply max_iterations from instance if provided
-        if hasattr(self.instance, 'max_iterations') and self.instance.max_iterations is not None:
-            simulator.MAX_ITERATIONS = self.instance.max_iterations
         iterations, qtdDistance = simulator.simulate()
         print(f"Portas: {len(doors)}, Iter: {iterations}, Dist: {qtdDistance}")
         iters.append(iterations)
         distances.append(qtdDistance)
 
         i=0
-        for current_seed in self.instance.scenario_seed[1:]:
+        for current_seed in scenario_seeds[1:]:
             i += 1
             scen.scenario_reset(current_seed, self.instance.simulation_seed)
             simulator = Simulator(scen)
-            # Apply max_iterations from instance if provided
-            if hasattr(self.instance, 'max_iterations') and self.instance.max_iterations is not None:
-                simulator.MAX_ITERATIONS = self.instance.max_iterations
             iterations, qtdDistance = simulator.simulate()
             print(f"Portas: {len(doors)}, Iter: {iterations}, Dist: {qtdDistance}")
             iters.append(iterations)
@@ -100,6 +102,14 @@ class Factory(ChromosomeFactory):
         distance = sum(distances)
         soma = soma / len(iters)
         distance = distance / len(distances)
+
+        # Valida e penaliza soluções inválidas (distância 0 ou iterações suspeitas)
+        if distance <= 0 or (soma == 0 and len(doors) > 0):
+            # Solução inválida: aplica penalidade alta
+            PENALTY_DISTANCE = 1e9
+            MAX_ITERS = self.instance.max_iterations if self.instance.max_iterations else 1200
+            print(f"⚠️ Solução inválida detectada - Portas: {len(doors)}, Iters: {soma}, Dist: {distance} -> PENALIZADA")
+            return len(doors), MAX_ITERS, PENALTY_DISTANCE
 
         print(f"Final decode - Portas: {len(doors)}, Iters: {soma}, Distance: {distance}")
         return len(doors), soma, distance

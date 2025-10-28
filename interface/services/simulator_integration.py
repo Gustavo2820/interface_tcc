@@ -74,7 +74,13 @@ class SimulatorIntegration:
         if draw:
             cmd.append("-d")
         if scenario_seed is not None:
-            cmd += ["-m", str(scenario_seed)]
+            # Se scenario_seed for uma lista, usar apenas o primeiro valor para o CLI
+            # O simulador interno usará a lista completa através do instance
+            if isinstance(scenario_seed, list):
+                seed_value = scenario_seed[0] if scenario_seed else 0
+            else:
+                seed_value = scenario_seed
+            cmd += ["-m", str(seed_value)]
         if simulation_seed is not None:
             cmd += ["-s", str(simulation_seed)]
         if max_iterations is not None:

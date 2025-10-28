@@ -71,8 +71,16 @@ class BruteForce:
 
         iters = []
         distances = []
+        
+        # Normaliza scenario_seed para lista (pode vir como int ou list)
+        if isinstance(self.instance.scenario_seed, list):
+            scenario_seeds = self.instance.scenario_seed
+        else:
+            scenario_seeds = [self.instance.scenario_seed]
+        
         scen = Scenario(self.instance.experiment, doors, self.instance.draw,
-                            self.instance.scenario_seed[0], self.instance.simulation_seed)
+                            scenario_seeds[0], self.instance.simulation_seed,
+                            individuals_position=False, max_iterations=self.instance.max_iterations)
         simulator = Simulator(scen)
         iterations, qtdDistance = simulator.simulate()
         print(f"Portas: {len(doors)}, Iter: {iterations}, Dist: {qtdDistance}")
@@ -80,7 +88,7 @@ class BruteForce:
         distances.append(qtdDistance)
 
         i=0
-        for current_seed in self.instance.scenario_seed[1:]:
+        for current_seed in scenario_seeds[1:]:
             i += 1
             scen.scenario_reset(current_seed, self.instance.simulation_seed)
             simulator = Simulator(scen)
@@ -93,6 +101,14 @@ class BruteForce:
         distance = sum(distances)
         soma = soma / len(iters)
         distance = distance / len(distances)
+
+        # Valida e penaliza soluções inválidas (distância 0 ou iterações suspeitas)
+        if distance <= 0 or (soma == 0 and len(doors) > 0):
+            # Solução inválida: aplica penalidade alta
+            PENALTY_DISTANCE = 1e9
+            MAX_ITERS = self.instance.max_iterations if self.instance.max_iterations else 1200
+            print(f"⚠️ Solução inválida detectada - Portas: {len(doors)}, Iters: {soma}, Dist: {distance} -> PENALIZADA")
+            return len(doors), MAX_ITERS, PENALTY_DISTANCE
 
         print(f"Final decode - Portas: {len(doors)}, Iters: {soma}, Distance: {distance}")
         return len(doors), soma, distance

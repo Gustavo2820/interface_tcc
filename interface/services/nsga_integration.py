@@ -269,11 +269,19 @@ class EvacuationProblem(Problem):
             draw_mode = self.simulation_params.get('draw_mode', False)
             max_iterations = self.simulation_params.get('max_iterations')
 
+            # NOTA: NSGA-II usa apenas um scenario_seed por avaliação (não faz média de múltiplos seeds)
+            # Se scenario_seed for uma lista, usamos apenas o primeiro valor
+            # A estratégia de múltiplos seeds é mais apropriada para algoritmos que fazem média interna
+            if isinstance(scenario_seed, list):
+                scenario_seed_value = scenario_seed[0] if scenario_seed else 0
+            else:
+                scenario_seed_value = scenario_seed
+
             # Execute simulator CLI and capture output for debugging
             proc = self.simulator_integration.run_simulator_cli(
                 experiment_name,
                 draw=draw_mode,
-                scenario_seed=scenario_seed,
+                scenario_seed=scenario_seed_value,
                 simulation_seed=simulation_seed,
                 max_iterations=max_iterations
             )
@@ -1057,10 +1065,21 @@ class NSGAIntegration:
                 iterations = obj_list[1]
                 distance = obj_list[2]
                 
-                # POST-PARETO FILTER: Remove solutions with 0 doors (they don't make sense)
+                # POST-PARETO FILTER: Remove invalid solutions
                 if num_doors is not None and int(num_doors) == 0:
                     logger.debug(f"Filtering out 0-door solution {i} from Pareto front")
                     continue
+                
+                # Filter out solutions with invalid distance (0 or negative)
+                if distance is not None and float(distance) <= 0:
+                    logger.debug(f"Filtering out solution {i} with invalid distance={distance} from Pareto front")
+                    continue
+                
+                # Filter out solutions with suspicious iterations (0 when there are doors)
+                if iterations is not None and num_doors is not None:
+                    if float(iterations) == 0 and int(num_doors) > 0:
+                        logger.debug(f"Filtering out solution {i} with suspicious iterations=0 and doors={num_doors}")
+                        continue
 
                 # Build expanded per-cell door coordinates from grouped/tuple representations.
                 # OFFICIAL INTEGRATION: Use integration_api.expand_grouped_doors

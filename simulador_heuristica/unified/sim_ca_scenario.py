@@ -13,7 +13,7 @@ import json
 class Scenario(object):
 
 
-    def __init__(self, experiment, doors=None, draw=False, scenario_seed=0, simulation_seed=0, individuals_position=False):
+    def __init__(self, experiment, doors=None, draw=False, scenario_seed=0, simulation_seed=0, individuals_position=False, max_iterations=None):
         self.directory = experiment
 
         self.sep = os.path.sep
@@ -30,6 +30,7 @@ class Scenario(object):
         self.scenario_seed = scenario_seed
         self.simulation_seed = simulation_seed
         self.individuals_position = individuals_position
+        self.max_iterations = max_iterations  # Store max_iterations for simulator
 
         self.num_simulation = 0
         self.num_scenario = 0

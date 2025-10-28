@@ -30,6 +30,10 @@ class Simulator(object):
         self.draw = scenario.draw
         self.iteration = 0
         self.log = Logs()
+        
+        # Use custom max_iterations from scenario if provided, otherwise use class default
+        if hasattr(scenario, 'max_iterations') and scenario.max_iterations is not None:
+            self.MAX_ITERATIONS = scenario.max_iterations
 
     def simulate(self):
         while (not self.check_evacuated_individuals() and self.iteration < self.MAX_ITERATIONS):
